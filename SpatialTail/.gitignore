@@ -1,0 +1,49 @@
+# Xcode
+*.xcworkspace
+*.xcuserdata
+*.xcschememanagement.plist
+*.xccheckout
+*.mode1v3
+*.moved-to-trash
+xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Stor*
+__MACOSX/
+*.LSOverride
+*.dmg
+*.pkg
+Icon?
+
+# Windows / Visual Studio
+*.vs
+*.exe
+*.sdf
+*.opensdf
+*.suo
+*.ncb
+*.vcproj.*
+*.depend
+*.layout
+*.db
+ipch/*
+
+# Build outputs
+build/
+build-*
+gui/*
+*.o
+*.a
+*.dylib
+*.zip
+
+# Plugin formats
+*.vst3
+
+# IDE / Tools
+.cache/
+compile_commands.json
+
+# Claude Code
+.claude/settings.local.json
