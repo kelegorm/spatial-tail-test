@@ -22,9 +22,11 @@ constexpr double kAutomationSmoothingTimeSeconds = 0.02;
 constexpr float kReverbTuningApplyEpsilon = 1.0e-6f;
 constexpr double kReverbLatencyDetectThreshold = 1.0e-12;
 constexpr double kReverbTailDetectThreshold = 1.0e-6;
+constexpr double kReverbLatencyMaxProbeSeconds = 0.25;
 constexpr double kReverbTailMaxProbeSeconds = 20.0;
 constexpr double kReverbTailSilenceWindowSeconds = 0.25;
-constexpr double kRealtimeSafeLatencySeconds = 1214.0 / 48000.0;
+constexpr int kRealtimeSafeLatencyBaseSamplesAt48k = 1214;
+constexpr int kRealtimeSafeLatencySafetySamples = 2;
 constexpr const char* kForceHRTFLoadFailureEnvVar = "SPATIALTAIL_DEBUG_FORCE_HRTF_LOAD_FAILURE";
 constexpr const char* kForcedInvalidSofaPath = "/__spatialtail__/forced-invalid.sofa";
 
@@ -286,6 +288,50 @@ inline void ApplyMonoDelay(const float* input, float* output, int nFrames, int d
   }
 }
 
+inline int MeasureReverbLatencySamples(double sampleRate,
+                                       float roomSize = static_cast<float>(kReverbRoomMax),
+                                       float damping = static_cast<float>(kReverbDampingMin))
+{
+  if (sampleRate <= 0.0)
+    return 0;
+
+  WDL_ReverbEngine probeReverb;
+  ResetReverb(probeReverb, sampleRate);
+  probeReverb.SetRoomSize(ClampReverbRoomSize(roomSize));
+  probeReverb.SetDampening(ClampReverbDamping(damping));
+  probeReverb.Reset(false);
+
+  constexpr int kBlockSize = 256;
+  const int maxProbeSamples =
+      std::max(kBlockSize, static_cast<int>(std::ceil(sampleRate * kReverbLatencyMaxProbeSeconds)));
+
+  std::vector<double> inL(kBlockSize, 0.0);
+  std::vector<double> inR(kBlockSize, 0.0);
+  std::vector<double> outL(kBlockSize, 0.0);
+  std::vector<double> outR(kBlockSize, 0.0);
+
+  inL[0] = 1.0;
+  inR[0] = 1.0;
+
+  int processedSamples = 0;
+  while (processedSamples < maxProbeSamples)
+  {
+    probeReverb.ProcessSampleBlock(inL.data(), inR.data(), outL.data(), outR.data(), kBlockSize);
+
+    for (int s = 0; s < kBlockSize && processedSamples < maxProbeSamples; ++s, ++processedSamples)
+    {
+      const double absSample = std::max(std::fabs(outL[s]), std::fabs(outR[s]));
+      if (absSample > kReverbLatencyDetectThreshold)
+        return processedSamples;
+    }
+
+    std::fill(inL.begin(), inL.end(), 0.0);
+    std::fill(inR.begin(), inR.end(), 0.0);
+  }
+
+  return 0;
+}
+
 inline ReverbHostTiming MeasureReverbHostTiming(double sampleRate,
                                                 float roomSize = static_cast<float>(kReverbRoomMax),
                                                 float damping = static_cast<float>(kReverbDampingMin))
@@ -358,7 +404,12 @@ inline ReverbHostTiming EstimateRealtimeSafeHostTiming(double sampleRate)
   if (sampleRate <= 0.0)
     return timing;
 
-  timing.latencySamples = std::max(0, static_cast<int>(std::ceil(sampleRate * kRealtimeSafeLatencySeconds)));
+  const int scaledBaselineLatency =
+      std::max(0, static_cast<int>(std::ceil(
+                      (sampleRate / 48000.0) * static_cast<double>(kRealtimeSafeLatencyBaseSamplesAt48k))));
+  const int conservativeLatency = scaledBaselineLatency + kRealtimeSafeLatencySafetySamples;
+  const int measuredLatency = MeasureReverbLatencySamples(sampleRate);
+  timing.latencySamples = measuredLatency > 0 ? std::max(conservativeLatency, measuredLatency) : conservativeLatency;
   timing.tailSamples = std::max(
       timing.latencySamples,
       static_cast<int>(std::ceil(sampleRate * kReverbTailMaxProbeSeconds)));

@@ -30,6 +30,7 @@ public:
 #if IPLUG_DSP // http://bit.ly/2S64BDd
   void ProcessBlock(sample** inputs, sample** outputs, int nFrames) override;
   void OnReset() override;
+  void OnActivate(bool active) override;
 #endif
 
 private:
@@ -55,4 +56,6 @@ private:
   float mAppliedReverbDamping = std::numeric_limits<float>::quiet_NaN();
   float mDistanceSmoothCoeff  = 0.f;
   double mLastSampleRate = 0.0;
+  bool mReverbInitialized = false;
+  bool mForceFullDspReset = false;
 };

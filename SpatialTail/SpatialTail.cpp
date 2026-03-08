@@ -84,22 +84,37 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
 }
 
 #if IPLUG_DSP
+void SpatialTail::OnActivate(bool active)
+{
+  Plugin::OnActivate(active);
+
+  // Some hosts call OnReset() during transport/bypass deactivate paths where
+  // stale wet/dry delay state must be flushed. Track that intent explicitly so
+  // block-size-only resets do not clear state mid-playback.
+  if (!active)
+    mForceFullDspReset = true;
+}
+
 void SpatialTail::OnReset()
 {
-  // Only reload SOFA (disk I/O) when the sample rate actually changes.
-  // Buffer-size-only resets still resize the scratch buffers below.
   const double sr = GetSampleRate();
-  spatialtail::ResetReverb(mReverb, sr);
-  mSmoothedReverbRoomSize = static_cast<float>(GetParam(kReverbRoomSize)->Value());
-  mSmoothedReverbDamping = static_cast<float>(GetParam(kReverbDamping)->Value());
-  mAppliedReverbRoomSize = std::numeric_limits<float>::quiet_NaN();
-  mAppliedReverbDamping = std::numeric_limits<float>::quiet_NaN();
-  spatialtail::ApplyReverbTuningRuntime(mReverb, mSmoothedReverbRoomSize, mSmoothedReverbDamping,
-                                        mAppliedReverbRoomSize, mAppliedReverbDamping);
-
-  if (sr != mLastSampleRate)
+  const bool requiresFullDspReset = !mReverbInitialized || sr != mLastSampleRate || mForceFullDspReset;
+  if (requiresFullDspReset)
   {
+    mForceFullDspReset = false;
+    mReverbInitialized = true;
     mLastSampleRate = sr;
+
+    // Full resets clear wet state and dry-alignment delay, so keep them limited
+    // to first initialization and real sample-rate changes.
+    spatialtail::ResetReverb(mReverb, sr);
+    mSmoothedReverbRoomSize = static_cast<float>(GetParam(kReverbRoomSize)->Value());
+    mSmoothedReverbDamping = static_cast<float>(GetParam(kReverbDamping)->Value());
+    mAppliedReverbRoomSize = std::numeric_limits<float>::quiet_NaN();
+    mAppliedReverbDamping = std::numeric_limits<float>::quiet_NaN();
+    spatialtail::ApplyReverbTuningRuntime(mReverb, mSmoothedReverbRoomSize, mSmoothedReverbDamping,
+                                          mAppliedReverbRoomSize, mAppliedReverbDamping);
+
     const auto reverbTiming = spatialtail::EstimateRealtimeSafeHostTiming(sr);
     mReverbLatencySamples = reverbTiming.latencySamples;
     mReverbTailSamples = reverbTiming.tailSamples;
@@ -125,7 +140,8 @@ void SpatialTail::OnReset()
   mReverbWetMono.assign(blockSize, 0.f);
   mHrtfL.assign(blockSize, 0.f);
   mHrtfR.assign(blockSize, 0.f);
-  spatialtail::PrepareMonoDelayLine(mDryDelayLine, mReverbLatencySamples, mDryDelayWritePos);
+  if (requiresFullDspReset)
+    spatialtail::PrepareMonoDelayLine(mDryDelayLine, mReverbLatencySamples, mDryDelayWritePos);
 }
 
 void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
@@ -157,21 +173,44 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
   const float reverbSmoothCoeff = spatialtail::ComputeBlockSmoothingCoefficient(
       GetSampleRate(), nFrames, spatialtail::kAutomationSmoothingTimeSeconds);
+  const float previousSmoothedRoomSize = mSmoothedReverbRoomSize;
+  const float previousSmoothedDamping = mSmoothedReverbDamping;
   mSmoothedReverbRoomSize = spatialtail::SmoothTowards(mSmoothedReverbRoomSize, reverbRoomTarget, reverbSmoothCoeff);
   mSmoothedReverbDamping = spatialtail::SmoothTowards(mSmoothedReverbDamping, reverbDampingTarget, reverbSmoothCoeff);
+  const float clampedSmoothedRoomSize = spatialtail::ClampReverbRoomSize(mSmoothedReverbRoomSize);
+  const float clampedSmoothedDamping = spatialtail::ClampReverbDamping(mSmoothedReverbDamping);
+  const float previousAppliedRoomSize = mAppliedReverbRoomSize;
+  const float previousAppliedDamping = mAppliedReverbDamping;
   const bool expectedReverbTuningApply = spatialtail::ShouldUpdateReverbTuning(
-      mAppliedReverbRoomSize, mAppliedReverbDamping,
-      spatialtail::ClampReverbRoomSize(mSmoothedReverbRoomSize),
-      spatialtail::ClampReverbDamping(mSmoothedReverbDamping));
+      previousAppliedRoomSize, previousAppliedDamping, clampedSmoothedRoomSize, clampedSmoothedDamping);
   const bool didApplyReverbTuning = spatialtail::ApplyReverbTuningRuntime(
       mReverb, mSmoothedReverbRoomSize, mSmoothedReverbDamping, mAppliedReverbRoomSize, mAppliedReverbDamping);
 #if !defined(NDEBUG)
-  if (expectedReverbTuningApply && !didApplyReverbTuning)
+  if (expectedReverbTuningApply != didApplyReverbTuning)
   {
-    DBGMSG("SpatialTail DEBUG: reverb tuning update expected but was not applied "
-           "(room target=%.6f, damping target=%.6f, smoothed room=%.6f, smoothed damping=%.6f)\n",
-           reverbRoomTarget, reverbDampingTarget, mSmoothedReverbRoomSize, mSmoothedReverbDamping);
-    assert(didApplyReverbTuning && "Reverb tuning update was expected but not applied.");
+    DBGMSG("SpatialTail DEBUG: runtime apply decision mismatched expected update predicate "
+           "(expected apply=%d, did apply=%d, previously applied room=%.6f, previously applied damping=%.6f, "
+           "room target=%.6f, damping target=%.6f, prev smoothed room=%.6f, prev smoothed damping=%.6f, "
+           "smoothed room=%.6f, smoothed damping=%.6f)\n",
+           expectedReverbTuningApply ? 1 : 0, didApplyReverbTuning ? 1 : 0,
+           previousAppliedRoomSize, previousAppliedDamping, reverbRoomTarget, reverbDampingTarget,
+           previousSmoothedRoomSize, previousSmoothedDamping,
+           mSmoothedReverbRoomSize, mSmoothedReverbDamping);
+    assert(false && "Runtime reverb tuning apply decision mismatched expected update predicate.");
+  }
+
+  if (didApplyReverbTuning)
+  {
+    const bool appliedMatchesSmoothed =
+        std::fabs(mAppliedReverbRoomSize - clampedSmoothedRoomSize) <= spatialtail::kReverbTuningApplyEpsilon
+        && std::fabs(mAppliedReverbDamping - clampedSmoothedDamping) <= spatialtail::kReverbTuningApplyEpsilon;
+    if (!appliedMatchesSmoothed)
+    {
+      DBGMSG("SpatialTail DEBUG: runtime apply reported success but applied state mismatched smoothed tuning "
+             "(applied room=%.6f, applied damping=%.6f, smoothed room=%.6f, smoothed damping=%.6f)\n",
+             mAppliedReverbRoomSize, mAppliedReverbDamping, mSmoothedReverbRoomSize, mSmoothedReverbDamping);
+      assert(false && "Runtime reverb tuning apply succeeded but tracked applied state is inconsistent.");
+    }
   }
 #endif
 

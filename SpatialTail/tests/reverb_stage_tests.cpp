@@ -407,23 +407,36 @@ bool TestHostTimingMeasurement()
 
 bool TestRealtimeSafeHostTimingEstimate()
 {
-  const auto timing48k = spatialtail::EstimateRealtimeSafeHostTiming(48000.0);
-  if (timing48k.latencySamples <= 0)
-    return false;
-  if (timing48k.tailSamples < timing48k.latencySamples)
-    return false;
-  if (timing48k.tailTruncated)
-    return false;
+  const std::vector<double> sampleRates = {44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0};
+  int previousLatency = 0;
+  int previousTail = 0;
+  for (double sampleRate : sampleRates)
+  {
+    const auto timing = spatialtail::EstimateRealtimeSafeHostTiming(sampleRate);
+    if (timing.latencySamples <= 0)
+      return false;
+    if (timing.tailSamples < timing.latencySamples)
+      return false;
+    if (timing.tailTruncated)
+      return false;
 
-  const int expectedTail48k = static_cast<int>(std::ceil(48000.0 * spatialtail::kReverbTailMaxProbeSeconds));
-  if (timing48k.tailSamples != expectedTail48k)
-    return false;
+    const int measuredLatency = spatialtail::MeasureReverbLatencySamples(sampleRate);
+    if (measuredLatency <= 0)
+      return false;
+    if (timing.latencySamples < measuredLatency)
+      return false;
 
-  const auto timing96k = spatialtail::EstimateRealtimeSafeHostTiming(96000.0);
-  if (timing96k.latencySamples <= timing48k.latencySamples)
-    return false;
-  if (timing96k.tailSamples <= timing48k.tailSamples)
-    return false;
+    const int expectedTail = static_cast<int>(std::ceil(sampleRate * spatialtail::kReverbTailMaxProbeSeconds));
+    if (timing.tailSamples != expectedTail)
+      return false;
+
+    if (timing.latencySamples <= previousLatency)
+      return false;
+    if (timing.tailSamples <= previousTail)
+      return false;
+    previousLatency = timing.latencySamples;
+    previousTail = timing.tailSamples;
+  }
 
   const auto invalid = spatialtail::EstimateRealtimeSafeHostTiming(0.0);
   if (invalid.latencySamples != 0 || invalid.tailSamples != 0 || invalid.tailTruncated)
@@ -628,6 +641,30 @@ bool TestRuntimeTuningApplyGuard()
   return true;
 }
 
+bool TestReverbTuningUpdatePredicateTracksAppliedState()
+{
+  constexpr float kAppliedRoom = 0.5f;
+  constexpr float kAppliedDamping = 0.25f;
+  const float epsilon = spatialtail::kReverbTuningApplyEpsilon;
+
+  const float previousSmoothedRoom = kAppliedRoom - 0.5f * epsilon;
+  const float currentSmoothedRoom = kAppliedRoom + 0.6f * epsilon;
+  const bool smoothedValueMovedAcrossEpsilon =
+      std::fabs(currentSmoothedRoom - previousSmoothedRoom) > epsilon;
+  if (!smoothedValueMovedAcrossEpsilon)
+    return false;
+
+  if (spatialtail::ShouldUpdateReverbTuning(kAppliedRoom, kAppliedDamping,
+                                            currentSmoothedRoom, kAppliedDamping))
+    return false;
+
+  if (!spatialtail::ShouldUpdateReverbTuning(kAppliedRoom, kAppliedDamping,
+                                             kAppliedRoom + 2.0f * epsilon, kAppliedDamping))
+    return false;
+
+  return true;
+}
+
 bool TestReverbTuningBugReproductionWithoutReset()
 {
   const int totalSamples = kReverbMetricTestBlockSize * kReverbMetricTestBlocks;
@@ -775,6 +812,12 @@ int main()
   if (!TestRuntimeTuningApplyGuard())
   {
     std::cerr << "TestRuntimeTuningApplyGuard failed\n";
+    return 1;
+  }
+
+  if (!TestReverbTuningUpdatePredicateTracksAppliedState())
+  {
+    std::cerr << "TestReverbTuningUpdatePredicateTracksAppliedState failed\n";
     return 1;
   }
 
