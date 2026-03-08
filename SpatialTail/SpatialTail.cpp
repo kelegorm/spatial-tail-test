@@ -11,7 +11,7 @@
 SpatialTail::SpatialTail(const InstanceInfo& info)
 : iplug::Plugin(info, MakeConfig(kNumParams, kNumPresets))
 {
-  GetParam(kAzimuth)->InitDouble("Azimuth", 0., -180., 180., 1., "deg");
+  GetParam(kAzimuth)->InitDouble("Azimuth", 0., -90., 90., 1., "deg");
   GetParam(kElevation)->InitDouble("Elevation", 0., -90., 90., 1., "deg");
   GetParam(kDistance)->InitDouble("Distance", 1., 0.1, 10., 0.01, "m");
   GetParam(kDryWet)->InitDouble("Dry/Wet", 1., 0., 1., 0.01, "");
@@ -46,7 +46,7 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
 
     // Labels for XY axes
     const IRECT xLabelBounds = IRECT(padBounds.L, padBounds.B + 2.f, padBounds.R, padBounds.B + 18.f);
-    pGraphics->AttachControl(new ITextControl(xLabelBounds, "Azimuth (-180..180 deg)", IText(12)));
+    pGraphics->AttachControl(new ITextControl(xLabelBounds, "Azimuth (-90..90 deg, front hemisphere)", IText(12)));
 
     // Knobs row at the bottom
     const float knobSize = 80.f;

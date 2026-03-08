@@ -1,5 +1,6 @@
 #include "HRTFProcessor.h"
 
+#include <algorithm>
 #include <cstring>
 
 #include "hrtf/mysofa.h"
@@ -46,11 +47,17 @@ void HRTFProcessor::updateFilter(float azimuthDeg, float elevationDeg, float dis
   if (!mEasy)
     return;
 
+  // Clamp to front-hemisphere bounds regardless of host automation.
+  // Azimuth [-90, 90] keeps source in front; elevation [-90, 90] is already full range.
+  const float az = std::max(-90.f, std::min(90.f, azimuthDeg));
+  const float el = std::max(-90.f, std::min(90.f, elevationDeg));
+  const float dist = std::max(0.1f, distanceM);
+
   // mysofa_s2c converts [azimuth_deg, elevation_deg, radius] to Cartesian [x,y,z].
   // SOFA/AES convention: positive azimuth is to the LEFT (counterclockwise from above).
   // GUI convention: positive X (azimuth param) is to the RIGHT.
   // Negate azimuth here so that moving the XY pad right puts the source on the right.
-  float coords[3] = { -azimuthDeg, elevationDeg, distanceM };
+  float coords[3] = { -az, el, dist };
   mysofa_s2c(coords);
 
   // delayL/delayR (ITD fractional delays) intentionally ignored for MVP

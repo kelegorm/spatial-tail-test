@@ -60,9 +60,9 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - [x] Mark completed
 
 ### Task 8: Front hemisphere limit for XY pad
-- [ ] Change azimuth control range from `[-180, 180]` to `[-90, 90]` to prevent routing behind the head
-- [ ] Ensure XY pad X axis label and parameter metadata reflect the new range
-- [ ] Clamp azimuth/elevation in DSP path before SOFA lookup to enforce bounds regardless of host automation values
-- [ ] Keep elevation limited to front-hemisphere-friendly range so top/bottom movement does not place source behind
-- [ ] Rebuild and verify extreme XY edges correspond to ±90 deg, not rear positions
-- [ ] Mark completed
+- [x] Change azimuth control range from `[-180, 180]` to `[-90, 90]` to prevent routing behind the head
+- [x] Ensure XY pad X axis label and parameter metadata reflect the new range
+- [x] Clamp azimuth/elevation in DSP path before SOFA lookup to enforce bounds regardless of host automation values
+- [x] Keep elevation limited to front-hemisphere-friendly range so top/bottom movement does not place source behind
+- [x] Rebuild and verify extreme XY edges correspond to ±90 deg, not rear positions
+- [x] Mark completed
