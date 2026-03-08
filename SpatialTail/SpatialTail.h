@@ -33,4 +33,6 @@ private:
   std::vector<float> mMonoIn;
   std::vector<float> mHrtfL;
   std::vector<float> mHrtfR;
+  float mSmoothedDistanceGain = 1.f;
+  float mDistanceSmoothCoeff  = 0.f;
 };

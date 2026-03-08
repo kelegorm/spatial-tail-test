@@ -43,3 +43,26 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - [x] Add knob for DryWet
 - [x] Connect controls to plugin parameters
 - [x] Mark completed
+
+### Task 6: Distance parameter audibility fix
+- [x] Confirm current behavior: `kDistance` is only passed to `mysofa_getfilter_float()` and does not apply gain/air attenuation in DSP
+- [x] In SpatialTail/SpatialTail.cpp add an explicit distance model after HRTF render (minimum: inverse-distance gain with safe clamp)
+- [x] Add optional smoothing for distance changes to avoid zipper noise
+- [x] Keep HRTF lookup distance argument, but make loudness change guaranteed across full knob travel
+- [x] Rebuild and verify audible change at 0.1 m vs 10 m on the same source position
+- [x] Mark completed
+
+### Task 7: XY left-right direction fix
+- [ ] Fix azimuth sign convention mismatch so moving XY point right produces sound from listener right
+- [ ] Implement mapping in one place only (recommended: inside HRTFProcessor::updateFilter or before calling it), avoid double inversion
+- [ ] Add a quick manual check procedure: center (0), right edge (+X), left edge (-X)
+- [ ] Rebuild and verify mapping in DAW headphones test
+- [ ] Mark completed
+
+### Task 8: Front hemisphere limit for XY pad
+- [ ] Change azimuth control range from `[-180, 180]` to `[-90, 90]` to prevent routing behind the head
+- [ ] Ensure XY pad X axis label and parameter metadata reflect the new range
+- [ ] Clamp azimuth/elevation in DSP path before SOFA lookup to enforce bounds regardless of host automation values
+- [ ] Keep elevation limited to front-hemisphere-friendly range so top/bottom movement does not place source behind
+- [ ] Rebuild and verify extreme XY edges correspond to ±90 deg, not rear positions
+- [ ] Mark completed

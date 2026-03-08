@@ -1,6 +1,7 @@
 #include "SpatialTail.h"
 #include "IPlug_include_in_plug_src.h"
 #include "IControls.h"
+#include <cmath>
 
 // Path to the SOFA file used for development (absolute path, prototype only)
 #ifndef DEFAULT_SOFA_PATH
@@ -72,6 +73,11 @@ void SpatialTail::OnReset()
   mMonoIn.assign(blockSize, 0.f);
   mHrtfL.assign(blockSize, 0.f);
   mHrtfR.assign(blockSize, 0.f);
+
+  // One-pole smoother: time constant ~20 ms to avoid zipper noise on distance knob
+  const float sr = static_cast<float>(GetSampleRate());
+  mDistanceSmoothCoeff = 1.f - std::exp(-1.f / (0.020f * sr));
+  mSmoothedDistanceGain = 1.f; // reset to reference distance gain
 }
 
 void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
@@ -93,12 +99,19 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
   mHRTF.process(mMonoIn.data(), mHrtfL.data(), mHrtfR.data(), nFrames, azimuth, elevation, distance);
 
-  // Mix dry mono + wet binaural into stereo outputs
+  // Inverse-distance gain: 1 m is the reference (gain = 1.0).
+  // Clamped so gain never exceeds 20 dB boost (distance < 0.1 m clips to 0.1).
+  const float safeDistance = distance < 0.1f ? 0.1f : distance;
+  const float targetGain   = 1.f / safeDistance; // 0.1 m → 10x, 10 m → 0.1x
+
+  // Mix dry mono + wet binaural (with smoothed distance gain) into stereo outputs
   for (int s = 0; s < nFrames; ++s)
   {
+    mSmoothedDistanceGain += mDistanceSmoothCoeff * (targetGain - mSmoothedDistanceGain);
+    const float wet = mSmoothedDistanceGain * dryWet;
     const float dry = mMonoIn[s] * (1.f - dryWet);
-    outputs[0][s] = static_cast<sample>(dry + mHrtfL[s] * dryWet);
-    outputs[1][s] = static_cast<sample>(dry + mHrtfR[s] * dryWet);
+    outputs[0][s] = static_cast<sample>(dry + mHrtfL[s] * wet);
+    outputs[1][s] = static_cast<sample>(dry + mHrtfR[s] * wet);
   }
 }
 #endif
