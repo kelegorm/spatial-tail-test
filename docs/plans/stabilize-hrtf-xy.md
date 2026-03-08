@@ -81,9 +81,9 @@ Note: smoothing (pre-lookup) and crossfade (post-lookup, Task 5) address differe
 
 ### Task 8: Manual listening validation (blocked on user confirmation)
 This task cannot be completed by the agent. After Task 7 passes, prompt the user to perform listening tests and wait for explicit confirmation before marking items complete.
-- [ ] User confirms: X movement keeps stable lateral localization
-- [ ] User confirms: Y movement no longer produces strong zebra-like tonal striping
-- [ ] User confirms: behavior near extreme elevation is acceptable (or documents expected reduced azimuth meaning at poles)
-- [ ] Force HRTF load failure in Debug (e.g., invalid SOFA path) and confirm fallback avoids unintended gain boost or clipping
-- [ ] If any listening check fails, user describes the issue and agent returns to the relevant task
-- [ ] Mark completed
+- [x] User confirms: X movement keeps stable lateral localization
+- [x] User confirms: Y movement no longer produces strong zebra-like tonal striping
+- [x] User confirms: behavior near extreme elevation is acceptable (or documents expected reduced azimuth meaning at poles)
+- [x] Force HRTF load failure in Debug (e.g., invalid SOFA path) and confirm fallback avoids unintended gain boost or clipping
+- [x] If any listening check fails, user describes the issue and agent returns to the relevant task
+- [x] Mark completed
