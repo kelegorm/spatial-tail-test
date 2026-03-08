@@ -66,7 +66,8 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
 #if IPLUG_DSP
 void SpatialTail::OnReset()
 {
-  mHRTF.load(DEFAULT_SOFA_PATH, static_cast<float>(GetSampleRate()));
+  if (!mHRTF.load(DEFAULT_SOFA_PATH, static_cast<float>(GetSampleRate())))
+    DBGMSG("HRTFProcessor: failed to load SOFA file: %s\n", DEFAULT_SOFA_PATH);
 }
 
 void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
@@ -79,7 +80,7 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // Sum stereo input to mono (only 1 input channel configured, but guard anyway)
   const int nInChans = NInChansConnected();
   static thread_local std::vector<float> monoIn;
-  monoIn.resize(nFrames, 0.f);
+  monoIn.assign(nFrames, 0.f);
 
   if (nInChans >= 1)
   {

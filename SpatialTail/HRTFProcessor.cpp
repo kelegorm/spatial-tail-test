@@ -17,6 +17,12 @@ HRTFProcessor::~HRTFProcessor()
 
 bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
 {
+  if (mEasy)
+  {
+    mysofa_close(mEasy);
+    mEasy = nullptr;
+  }
+
   int err = 0;
   mEasy = mysofa_open(sofaPath, sampleRate, &mFilterLength, &err);
   if (!mEasy || err != 0)
@@ -35,13 +41,19 @@ bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
 
 void HRTFProcessor::updateFilter(float azimuthDeg, float elevationDeg, float distanceM)
 {
+  if (!mEasy)
+    return;
+
   // mysofa_s2c converts [azimuth_deg, elevation_deg, radius] to Cartesian [x,y,z]
   float coords[3] = { azimuthDeg, elevationDeg, distanceM };
   mysofa_s2c(coords);
 
+  // delayL/delayR (ITD fractional delays) intentionally ignored for MVP
   float delayL, delayR;
   mysofa_getfilter_float(mEasy, coords[0], coords[1], coords[2],
                          mIRLeft.data(), mIRRight.data(), &delayL, &delayR);
+  (void)delayL;
+  (void)delayR;
 }
 
 void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFrames,
