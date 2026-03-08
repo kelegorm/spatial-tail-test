@@ -32,10 +32,10 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - [x] Mark completed
 
 ### Task 4: Wire DSP
-- [ ] In SpatialTail/SpatialTail.h add HRTFProcessor member and parameters for azimuth, elevation, distance, dryWet
-- [ ] In SpatialTail/SpatialTail.cpp constructor initialize HRTFProcessor with default.sofa path
-- [ ] In ProcessBlock: sum stereo input to mono, call HRTFProcessor::process(), mix with dry via dryWet
-- [ ] Mark completed
+- [x] In SpatialTail/SpatialTail.h add HRTFProcessor member and parameters for azimuth, elevation, distance, dryWet
+- [x] In SpatialTail/SpatialTail.cpp constructor initialize HRTFProcessor with default.sofa path
+- [x] In ProcessBlock: sum stereo input to mono, call HRTFProcessor::process(), mix with dry via dryWet
+- [x] Mark completed
 
 ### Task 5: GUI
 - [ ] Add XY pad control for Azimuth (X axis -180..180) and Elevation (Y axis -90..90)
