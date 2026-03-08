@@ -42,10 +42,39 @@ iplug_add_plugin(${PROJECT_NAME}
   SOURCES
     SpatialTail.cpp
     SpatialTail.h
+    HRTFProcessor.cpp
+    HRTFProcessor.h
     resources/resource.h
   RESOURCES
     resources/fonts/Roboto-Regular.ttf
 )
+
+set(SPATIALTAIL_LIBMYSOFA_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libs/libmysofa/src")
+set(SPATIALTAIL_LIBMYSOFA_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libs/libmysofa/build/src")
+set(SPATIALTAIL_LIBMYSOFA_STATIC "${SPATIALTAIL_LIBMYSOFA_BUILD_DIR}/libmysofa.a")
+
+set(SPATIALTAIL_PLUGIN_TARGETS
+  ${PROJECT_NAME}-app
+  ${PROJECT_NAME}-au
+  ${PROJECT_NAME}-vst3
+  ${PROJECT_NAME}AU-framework
+  ${PROJECT_NAME}AUv3-appex
+)
+
+foreach(SPATIALTAIL_TARGET IN LISTS SPATIALTAIL_PLUGIN_TARGETS)
+  if(TARGET ${SPATIALTAIL_TARGET})
+    target_include_directories(${SPATIALTAIL_TARGET}
+      PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${SPATIALTAIL_LIBMYSOFA_SRC_DIR}"
+    )
+    target_include_directories(${SPATIALTAIL_TARGET} SYSTEM PRIVATE "${SPATIALTAIL_LIBMYSOFA_BUILD_DIR}")
+
+    if(EXISTS "${SPATIALTAIL_LIBMYSOFA_STATIC}")
+      target_link_libraries(${SPATIALTAIL_TARGET} PRIVATE "${SPATIALTAIL_LIBMYSOFA_STATIC}" z)
+    endif()
+  endif()
+endforeach()
 
 include(CTest)
 if(BUILD_TESTING)

@@ -1,2 +1,6 @@
 claude_command = ./.ralphex/scripts/codex-as-claude.sh
 claude_args =
+external_review_tool = custom
+custom_review_script = ./.ralphex/scripts/claude-external-review.sh
+max_external_iterations = 2
+review_patience = 1

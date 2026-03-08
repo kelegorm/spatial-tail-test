@@ -3,5 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/libs/iPlug2" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libs/libmysofa" vcs="Git" />
   </component>
 </project>
