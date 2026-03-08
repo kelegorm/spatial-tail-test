@@ -95,6 +95,15 @@ private:
   float mLastElevationDeg = 1e10f;
   float mLastDistanceM   = 1e10f;
 
+  // Azimuth/elevation smoothing (Task 6).
+  // Values are smoothed with a one-pole IIR (time constant kAzElSmoothingTimeSec)
+  // before reaching the HRTF lookup. This reduces how often the lookup target
+  // changes, complementing the crossfade (Task 5) that handles each transition.
+  // Sentinel value (1e10f) causes the first block to snap directly to the input.
+  static constexpr float kAzElSmoothingTimeSec = 0.020f; // 20 ms, matches kAutomationSmoothingTimeSeconds
+  float mSmoothedAzimuthDeg  = 1e10f;
+  float mSmoothedElevationDeg = 1e10f;
+
   // Delay values captured at the start of the current crossfade ("from" side).
   // Set whenever a new crossfade begins; used for per-sample ITD interpolation.
   float mFromDelayL = 0.f;

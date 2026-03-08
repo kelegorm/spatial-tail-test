@@ -65,14 +65,14 @@ Note: this task in isolation may sound worse than current behavior because ITD w
 
 ### Task 6: Add azimuth/elevation smoothing before HRTF lookup
 Note: smoothing (pre-lookup) and crossfade (post-lookup, Task 5) address different layers of the problem. Smoothing reduces how often the HRTF lookup target jumps; crossfade handles the transition when it does jump. Both are needed for dense SOFA grids.
-- [ ] Add smoothing state for azimuth and elevation similar in spirit to existing automation smoothing utilities
-- [ ] Smooth parameter changes before calling into `mHRTF.process(...)`
-- [ ] Keep existing azimuth sign convention unless a concrete bug is proven
-- [ ] Reuse existing smoothing helpers/constants where appropriate instead of inventing a separate style
-- [ ] Verify that distance smoothing and reverb tuning smoothing still behave as before
-- [ ] Confirm smoothing response test from Task 3 passes
-- [ ] Confirm all Task 3 tests pass with smoothing and crossfade both enabled
-- [ ] Mark completed
+- [x] Add smoothing state for azimuth and elevation similar in spirit to existing automation smoothing utilities
+- [x] Smooth parameter changes before calling into `mHRTF.process(...)`
+- [x] Keep existing azimuth sign convention unless a concrete bug is proven
+- [x] Reuse existing smoothing helpers/constants where appropriate instead of inventing a separate style
+- [x] Verify that distance smoothing and reverb tuning smoothing still behave as before
+- [x] Confirm smoothing response test from Task 3 passes
+- [x] Confirm all Task 3 tests pass with smoothing and crossfade both enabled
+- [x] Mark completed
 
 ### Task 7: Build validation and automated test gate
 - [ ] Rebuild and run validation commands

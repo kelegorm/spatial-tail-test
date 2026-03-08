@@ -62,6 +62,10 @@ bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
   mLastElevationDeg = 1e10f;
   mLastDistanceM   = 1e10f;
 
+  // Azimuth/elevation smoothing sentinels: first block snaps to input.
+  mSmoothedAzimuthDeg  = 1e10f;
+  mSmoothedElevationDeg = 1e10f;
+
   // Crossfade "from" delays: reset at load time.
   mFromDelayL = 0.f;
   mFromDelayR = 0.f;
@@ -155,24 +159,65 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
     return;
   }
 
+  // ---------------------------------------------------------------------------
+  // Azimuth/elevation smoothing (Task 6).
+  // Advance smoothed az/el values one block toward the host-provided target
+  // before passing them to the HRTF lookup. This reduces how often the lookup
+  // target changes meaningfully, complementing the crossfade (Task 5) which
+  // handles each individual transition.
+  //
+  // Sentinel value (1e10f) indicates the first call after load(): snap
+  // immediately so there is no initial sweep from 0 to the actual position.
+  // ---------------------------------------------------------------------------
 #ifndef NDEBUG
-  (void)mDebug.disableSmoothing;
+  const bool applySmoothing = !mDebug.disableSmoothing;
+#else
+  constexpr bool applySmoothing = true;
 #endif
 
-  // Only re-look up the HRTF when position changes beyond a small threshold.
-  // This prevents restarting an in-progress crossfade on every block when the
-  // host keeps sending the same parameter values, and avoids redundant SOFA work.
+  float smoothAz, smoothEl;
+  if (mSmoothedAzimuthDeg > 1e9f)
+  {
+    // First block after load(): snap directly to input, no interpolation.
+    mSmoothedAzimuthDeg  = azimuthDeg;
+    mSmoothedElevationDeg = elevationDeg;
+    smoothAz = azimuthDeg;
+    smoothEl = elevationDeg;
+  }
+  else if (applySmoothing)
+  {
+    // One-pole IIR: coeff = 1 - exp(-nFrames / (sr * T))
+    const float coeff = 1.f - std::exp(-static_cast<float>(nFrames)
+                                       / (mSampleRate * kAzElSmoothingTimeSec));
+    mSmoothedAzimuthDeg  += coeff * (azimuthDeg  - mSmoothedAzimuthDeg);
+    mSmoothedElevationDeg += coeff * (elevationDeg - mSmoothedElevationDeg);
+    smoothAz = mSmoothedAzimuthDeg;
+    smoothEl = mSmoothedElevationDeg;
+  }
+  else
+  {
+    // Smoothing disabled: pass host values through unmodified.
+    mSmoothedAzimuthDeg  = azimuthDeg;
+    mSmoothedElevationDeg = elevationDeg;
+    smoothAz = azimuthDeg;
+    smoothEl = elevationDeg;
+  }
+
+  // Only re-look up the HRTF when the smoothed position changes beyond a small
+  // threshold. This prevents restarting an in-progress crossfade on every block
+  // when the host keeps sending the same parameter values, and avoids redundant
+  // SOFA work.
   static constexpr float kPosTolerance = 0.1f;  // degrees / metres
   const bool posChanged =
-      (std::fabs(azimuthDeg  - mLastAzimuthDeg)   > kPosTolerance ||
-       std::fabs(elevationDeg - mLastElevationDeg) > kPosTolerance ||
+      (std::fabs(smoothAz    - mLastAzimuthDeg)   > kPosTolerance ||
+       std::fabs(smoothEl    - mLastElevationDeg) > kPosTolerance ||
        std::fabs(distanceM   - mLastDistanceM)     > kPosTolerance);
 
   if (posChanged)
   {
-    lookupTarget(azimuthDeg, elevationDeg, distanceM);
-    mLastAzimuthDeg   = azimuthDeg;
-    mLastElevationDeg = elevationDeg;
+    lookupTarget(smoothAz, smoothEl, distanceM);
+    mLastAzimuthDeg   = smoothAz;
+    mLastElevationDeg = smoothEl;
     mLastDistanceM    = distanceM;
   }
 
