@@ -13,6 +13,8 @@ enum EParams
   kElevation,
   kDistance,
   kDryWet,
+  kReverbRoomSize,
+  kReverbDamping,
   kNumParams
 };
 
@@ -46,6 +48,8 @@ private:
   int mReverbTailSamples = 0;
   int mDryDelayWritePos = 0;
   float mSmoothedDistanceGain = 1.f;
+  float mSmoothedReverbRoomSize = static_cast<float>(spatialtail::kReverbDefaultRoomSize);
+  float mSmoothedReverbDamping = static_cast<float>(spatialtail::kReverbDefaultDamping);
   float mDistanceSmoothCoeff  = 0.f;
   double mLastSampleRate = 0.0;
 };

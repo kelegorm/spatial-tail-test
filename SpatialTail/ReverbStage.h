@@ -11,6 +11,11 @@ namespace spatialtail
 constexpr double kReverbDefaultRoomSize = 0.72;
 constexpr double kReverbDefaultDamping = 0.30;
 constexpr double kReverbDefaultWidth = 1.0;
+constexpr double kReverbRoomMin = 0.0;
+constexpr double kReverbRoomMax = 0.99;
+constexpr double kReverbDampingMin = 0.0;
+constexpr double kReverbDampingMax = 1.0;
+constexpr double kAutomationSmoothingTimeSeconds = 0.02;
 constexpr double kReverbLatencyDetectThreshold = 1.0e-12;
 constexpr double kReverbTailDetectThreshold = 1.0e-6;
 constexpr double kReverbTailMaxProbeSeconds = 20.0;
@@ -29,11 +34,46 @@ inline void ConfigureReverbDefaults(WDL_ReverbEngine& reverb)
   reverb.SetWidth(kReverbDefaultWidth);
 }
 
+inline float ClampReverbRoomSize(float roomSize)
+{
+  return std::max(static_cast<float>(kReverbRoomMin), std::min(static_cast<float>(kReverbRoomMax), roomSize));
+}
+
+inline float ClampReverbDamping(float damping)
+{
+  return std::max(static_cast<float>(kReverbDampingMin), std::min(static_cast<float>(kReverbDampingMax), damping));
+}
+
+inline void ApplyReverbTuning(WDL_ReverbEngine& reverb, float roomSize, float damping)
+{
+  reverb.SetRoomSize(ClampReverbRoomSize(roomSize));
+  reverb.SetDampening(ClampReverbDamping(damping));
+}
+
 inline void ResetReverb(WDL_ReverbEngine& reverb, double sampleRate)
 {
   reverb.SetSampleRate(sampleRate);
   ConfigureReverbDefaults(reverb);
   reverb.Reset(true);
+}
+
+inline float ComputeBlockSmoothingCoefficient(double sampleRate, int blockSize, double smoothingTimeSeconds)
+{
+  if (sampleRate <= 0.0 || blockSize <= 0 || smoothingTimeSeconds <= 0.0)
+    return 1.f;
+
+  const double blockSamples = static_cast<double>(blockSize);
+  const double tauSamples = sampleRate * smoothingTimeSeconds;
+  if (tauSamples <= 0.0)
+    return 1.f;
+
+  return static_cast<float>(1.0 - std::exp(-blockSamples / tauSamples));
+}
+
+inline float SmoothTowards(float current, float target, float coefficient)
+{
+  const float coeff = std::max(0.f, std::min(1.f, coefficient));
+  return current + coeff * (target - current);
 }
 
 inline void CopyMonoToStereoReverbInputs(const float* monoFoldDown, double* reverbInL, double* reverbInR, int nFrames)

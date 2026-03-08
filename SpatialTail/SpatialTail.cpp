@@ -15,6 +15,10 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
   GetParam(kElevation)->InitDouble("Elevation", 0., -90., 90., 1., "deg");
   GetParam(kDistance)->InitDouble("Distance", 1., 0.1, 10., 0.01, "m");
   GetParam(kDryWet)->InitDouble("Dry/Wet", 1., 0., 1., 0.01, "");
+  GetParam(kReverbRoomSize)->InitDouble("Reverb Room", spatialtail::kReverbDefaultRoomSize,
+                                        spatialtail::kReverbRoomMin, spatialtail::kReverbRoomMax, 0.001, "");
+  GetParam(kReverbDamping)->InitDouble("Reverb Damping", spatialtail::kReverbDefaultDamping,
+                                       spatialtail::kReverbDampingMin, spatialtail::kReverbDampingMax, 0.001, "");
 
   const auto initialTiming = spatialtail::MeasureReverbHostTiming(44100.0);
   mReverbLatencySamples = initialTiming.latencySamples;
@@ -55,15 +59,25 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
     pGraphics->AttachControl(new ITextControl(xLabelBounds, "Azimuth (-90..90 deg, front hemisphere)", IText(12)));
 
     // Knobs row at the bottom
-    const float knobSize = 80.f;
+    const float knobSize = 72.f;
+    const float knobSpacing = 28.f;
     const float knobY = padBounds.B + 30.f;
-    const float totalKnobWidth = knobSize * 2 + 40.f;
+    const float totalKnobWidth = knobSize * 4 + knobSpacing * 3;
     const float knobStartX = bounds.MW() - totalKnobWidth * 0.5f;
 
-    const IRECT distanceBounds = IRECT(knobStartX, knobY, knobStartX + knobSize, knobY + knobSize);
+    const IRECT roomBounds = IRECT(knobStartX, knobY, knobStartX + knobSize, knobY + knobSize);
+    pGraphics->AttachControl(new IVKnobControl(roomBounds, kReverbRoomSize, "Room"));
+
+    const IRECT dampingBounds = IRECT(knobStartX + knobSize + knobSpacing, knobY,
+                                      knobStartX + knobSize * 2 + knobSpacing, knobY + knobSize);
+    pGraphics->AttachControl(new IVKnobControl(dampingBounds, kReverbDamping, "Damping"));
+
+    const IRECT distanceBounds = IRECT(knobStartX + (knobSize + knobSpacing) * 2, knobY,
+                                       knobStartX + (knobSize + knobSpacing) * 2 + knobSize, knobY + knobSize);
     pGraphics->AttachControl(new IVKnobControl(distanceBounds, kDistance, "Distance"));
 
-    const IRECT dryWetBounds = IRECT(knobStartX + knobSize + 40.f, knobY, knobStartX + knobSize * 2 + 40.f, knobY + knobSize);
+    const IRECT dryWetBounds = IRECT(knobStartX + (knobSize + knobSpacing) * 3, knobY,
+                                     knobStartX + (knobSize + knobSpacing) * 3 + knobSize, knobY + knobSize);
     pGraphics->AttachControl(new IVKnobControl(dryWetBounds, kDryWet, "Dry/Wet"));
   };
 #endif
@@ -76,6 +90,9 @@ void SpatialTail::OnReset()
   // Buffer-size-only resets still resize the scratch buffers below.
   const double sr = GetSampleRate();
   spatialtail::ResetReverb(mReverb, sr);
+  mSmoothedReverbRoomSize = static_cast<float>(GetParam(kReverbRoomSize)->Value());
+  mSmoothedReverbDamping = static_cast<float>(GetParam(kReverbDamping)->Value());
+  spatialtail::ApplyReverbTuning(mReverb, mSmoothedReverbRoomSize, mSmoothedReverbDamping);
 
   if (sr != mLastSampleRate)
   {
@@ -113,6 +130,8 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const float elevation = static_cast<float>(GetParam(kElevation)->Value());
   const float distance = static_cast<float>(GetParam(kDistance)->Value());
   const float dryWet   = static_cast<float>(GetParam(kDryWet)->Value());
+  const float reverbRoomTarget = static_cast<float>(GetParam(kReverbRoomSize)->Value());
+  const float reverbDampingTarget = static_cast<float>(GetParam(kReverbDamping)->Value());
 
   if (nFrames > static_cast<int>(mMonoIn.size()))
   {
@@ -132,6 +151,12 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // dual-mono for the current reverb engine implementation.
   const int nInChans = NInChansConnected();
   spatialtail::FoldDownToMono(inputs, nInChans, mMonoIn.data(), nFrames);
+
+  const float reverbSmoothCoeff = spatialtail::ComputeBlockSmoothingCoefficient(
+      GetSampleRate(), nFrames, spatialtail::kAutomationSmoothingTimeSeconds);
+  mSmoothedReverbRoomSize = spatialtail::SmoothTowards(mSmoothedReverbRoomSize, reverbRoomTarget, reverbSmoothCoeff);
+  mSmoothedReverbDamping = spatialtail::SmoothTowards(mSmoothedReverbDamping, reverbDampingTarget, reverbSmoothCoeff);
+  spatialtail::ApplyReverbTuning(mReverb, mSmoothedReverbRoomSize, mSmoothedReverbDamping);
 
   spatialtail::CopyMonoToStereoReverbInputs(mMonoIn.data(), mReverbInL.data(), mReverbInR.data(), nFrames);
   mReverb.ProcessSampleBlock(mReverbInL.data(), mReverbInR.data(), mReverbOutL.data(), mReverbOutR.data(), nFrames);

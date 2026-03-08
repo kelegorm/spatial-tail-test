@@ -81,6 +81,65 @@ bool TestReverbDefaultsInExpectedRange()
       && spatialtail::kReverbDefaultWidth >= -1.0 && spatialtail::kReverbDefaultWidth <= 1.0;
 }
 
+bool TestReverbParameterRangeContract()
+{
+  if (spatialtail::kReverbRoomMin < 0.0 || spatialtail::kReverbRoomMax > 1.0 || spatialtail::kReverbRoomMin >= spatialtail::kReverbRoomMax)
+    return false;
+
+  if (spatialtail::kReverbDampingMin < 0.0 || spatialtail::kReverbDampingMax > 1.0 || spatialtail::kReverbDampingMin >= spatialtail::kReverbDampingMax)
+    return false;
+
+  if (std::fabs(spatialtail::ClampReverbRoomSize(-1.0f) - static_cast<float>(spatialtail::kReverbRoomMin)) > static_cast<float>(kEpsilon))
+    return false;
+
+  if (std::fabs(spatialtail::ClampReverbRoomSize(2.0f) - static_cast<float>(spatialtail::kReverbRoomMax)) > static_cast<float>(kEpsilon))
+    return false;
+
+  if (std::fabs(spatialtail::ClampReverbDamping(-1.0f) - static_cast<float>(spatialtail::kReverbDampingMin)) > static_cast<float>(kEpsilon))
+    return false;
+
+  if (std::fabs(spatialtail::ClampReverbDamping(2.0f) - static_cast<float>(spatialtail::kReverbDampingMax)) > static_cast<float>(kEpsilon))
+    return false;
+
+  return true;
+}
+
+bool TestReverbAutomationSmoothing()
+{
+  const float coeff = spatialtail::ComputeBlockSmoothingCoefficient(48000.0, 256, spatialtail::kAutomationSmoothingTimeSeconds);
+  if (coeff <= 0.f || coeff >= 1.f)
+    return false;
+
+  const float start = 0.15f;
+  const float target = 0.95f;
+  float smoothed = start;
+
+  const float first = spatialtail::SmoothTowards(smoothed, target, coeff);
+  if (first <= start || first >= target)
+    return false;
+
+  smoothed = first;
+  for (int i = 0; i < 48; ++i)
+  {
+    const float next = spatialtail::SmoothTowards(smoothed, target, coeff);
+    if (next < smoothed || next > target + static_cast<float>(kEpsilon))
+      return false;
+    smoothed = next;
+  }
+
+  // After roughly a quarter-second of blocks, the smoothed value should be
+  // near target but still have changed gradually.
+  if (std::fabs(smoothed - target) > 1.0e-3f)
+    return false;
+
+  const float fullJump = target - start;
+  const float smoothedFirstJump = first - start;
+  if (smoothedFirstJump >= fullJump)
+    return false;
+
+  return true;
+}
+
 bool TestResetClearsTail()
 {
   constexpr int kFrames = 256;
@@ -196,6 +255,18 @@ int main()
   if (!TestReverbDefaultsInExpectedRange())
   {
     std::cerr << "TestReverbDefaultsInExpectedRange failed\n";
+    return 1;
+  }
+
+  if (!TestReverbParameterRangeContract())
+  {
+    std::cerr << "TestReverbParameterRangeContract failed\n";
+    return 1;
+  }
+
+  if (!TestReverbAutomationSmoothing())
+  {
+    std::cerr << "TestReverbAutomationSmoothing failed\n";
     return 1;
   }
 

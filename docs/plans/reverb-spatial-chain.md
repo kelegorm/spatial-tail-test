@@ -29,11 +29,11 @@ Goal: spatialize the reverb output (tail/object), not the raw dry input.
 - [x] Mark completed
 
 ### Task 4: Parameter registration and wiring for reverb stage
-- [ ] Add parameters needed for useful reverb behavior (minimum: room/decay and damping/tone control)
-- [ ] Register parameters in plugin constructor/parameter layout with explicit ranges and defaults
-- [ ] Wire registered parameters in DSP and expose them in GUI controls
-- [ ] Verify host automation updates reverb parameters without zipper artifacts
-- [ ] Mark completed
+- [x] Add parameters needed for useful reverb behavior (minimum: room/decay and damping/tone control)
+- [x] Register parameters in plugin constructor/parameter layout with explicit ranges and defaults
+- [x] Wire registered parameters in DSP and expose them in GUI controls
+- [x] Verify host automation updates reverb parameters without zipper artifacts
+- [x] Mark completed
 
 ### Task 5: Wet-path spatial behavior verification
 Listening notes (manual, outside ralphex task checkboxes):
