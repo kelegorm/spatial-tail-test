@@ -10,9 +10,9 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - `pluginval --strictness-level 5 ~/Library/Audio/Plug-Ins/VST3/SpatialTail.vst3`
 
 ### Task 1: Channel IO
-- [ ] In SpatialTail/config/config.h change PLUG_CHANNEL_IO to "1-2" (mono in, stereo out)
-- [ ] Rebuild and verify plugin still loads
-- [ ] Mark completed
+- [x] In SpatialTail/config/config.h change PLUG_CHANNEL_IO to "1-2" (mono in, stereo out)
+- [x] Rebuild and verify plugin still loads
+- [x] Mark completed
 
 ### Task 2: libmysofa dependency
 - [ ] Add libmysofa as git submodule in libs/libmysofa using https://github.com/hoene/libmysofa
