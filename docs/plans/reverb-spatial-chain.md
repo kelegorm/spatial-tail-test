@@ -16,11 +16,11 @@ Goal: spatialize the reverb output (tail/object), not the raw dry input.
 - [x] Mark completed
 
 ### Task 2: DSP routing change (reverb -> HRTF)
-- [ ] In `SpatialTail/SpatialTail.cpp` change the processing chain so input is first passed through reverb, and only reverb output is sent to `HRTFProcessor::process()`
-- [ ] Keep mono fold-down as the source for the reverb input to preserve a stable spatial object
-- [ ] Ensure dry signal path remains controlled by `kDryWet` and does not bypass the new routing by mistake
-- [ ] Verify dry tap point is pre-reverb (dry path must come from original mono fold-down/input, not from reverb output)
-- [ ] Mark completed
+- [x] In `SpatialTail/SpatialTail.cpp` change the processing chain so input is first passed through reverb, and only reverb output is sent to `HRTFProcessor::process()`
+- [x] Keep mono fold-down as the source for the reverb input to preserve a stable spatial object
+- [x] Ensure dry signal path remains controlled by `kDryWet` and does not bypass the new routing by mistake
+- [x] Verify dry tap point is pre-reverb (dry path must come from original mono fold-down/input, not from reverb output)
+- [x] Mark completed
 
 ### Task 3: Host contract for latency and tail
 - [ ] Determine reverb algorithmic latency; if non-zero, report it to host via plugin latency API and keep dry/wet time-aligned

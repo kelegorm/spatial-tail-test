@@ -88,6 +88,7 @@ void SpatialTail::OnReset()
   mReverbInR.assign(blockSize, 0.0);
   mReverbOutL.assign(blockSize, 0.0);
   mReverbOutR.assign(blockSize, 0.0);
+  mReverbWetMono.assign(blockSize, 0.f);
   mHrtfL.assign(blockSize, 0.f);
   mHrtfR.assign(blockSize, 0.f);
 }
@@ -106,6 +107,7 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mReverbInR.assign(nFrames, 0.0);
     mReverbOutL.assign(nFrames, 0.0);
     mReverbOutR.assign(nFrames, 0.0);
+    mReverbWetMono.assign(nFrames, 0.f);
     mHrtfL.assign(nFrames, 0.f);
     mHrtfR.assign(nFrames, 0.f);
   }
@@ -114,46 +116,32 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // The source is a mono fold-down of host inputs and is then duplicated to
   // dual-mono for the current reverb engine implementation.
   const int nInChans = NInChansConnected();
-  std::fill(mMonoIn.begin(), mMonoIn.begin() + nFrames, 0.f);
-
-  if (nInChans == 1)
-  {
-    for (int s = 0; s < nFrames; ++s)
-      mMonoIn[s] = static_cast<float>(inputs[0][s]);
-  }
-  else if (nInChans > 1)
-  {
-    for (int s = 0; s < nFrames; ++s)
-    {
-      float mono = 0.f;
-      for (int c = 0; c < nInChans; ++c)
-        mono += static_cast<float>(inputs[c][s]);
-
-      mMonoIn[s] = mono / static_cast<float>(nInChans);
-    }
-  }
+  spatialtail::FoldDownToMono(inputs, nInChans, mMonoIn.data(), nFrames);
 
   spatialtail::CopyMonoToStereoReverbInputs(mMonoIn.data(), mReverbInL.data(), mReverbInR.data(), nFrames);
   mReverb.ProcessSampleBlock(mReverbInL.data(), mReverbInR.data(), mReverbOutL.data(), mReverbOutR.data(), nFrames);
+  spatialtail::CollapseStereoReverbToMono(mReverbOutL.data(), mReverbOutR.data(), mReverbWetMono.data(), nFrames);
 
-  // If HRTF failed to load, pass mono through to both channels without applying
-  // distance gain (which could boost up to 10x and cause clipping on the fallback signal).
-  if (!mHRTF.isLoaded())
+  const bool hrtfLoaded = mHRTF.isLoaded();
+  if (hrtfLoaded)
   {
+    // Spatialize only the reverb output to keep dry path independent of HRTF positioning.
+    mHRTF.process(mReverbWetMono.data(), mHrtfL.data(), mHrtfR.data(), nFrames, azimuth, elevation, distance);
+  }
+  else
+  {
+    // Fallback keeps wet path from the reverb stage but bypasses distance boost.
     for (int s = 0; s < nFrames; ++s)
     {
-      outputs[0][s] = static_cast<sample>(mMonoIn[s]);
-      outputs[1][s] = static_cast<sample>(mMonoIn[s]);
+      mHrtfL[s] = mReverbWetMono[s];
+      mHrtfR[s] = mReverbWetMono[s];
     }
-    return;
   }
-
-  mHRTF.process(mMonoIn.data(), mHrtfL.data(), mHrtfR.data(), nFrames, azimuth, elevation, distance);
 
   // Inverse-distance gain: 1 m is the reference (gain = 1.0).
   // Clamped so gain never exceeds 20 dB boost (distance < 0.1 m clips to 0.1).
   const float safeDistance = distance < 0.1f ? 0.1f : distance;
-  const float targetGain   = 1.f / safeDistance; // 0.1 m → 10x, 10 m → 0.1x
+  const float targetGain   = hrtfLoaded ? (1.f / safeDistance) : 1.f; // 0.1 m → 10x, 10 m → 0.1x
 
   // Mix dry mono + wet binaural (with smoothed distance gain) into stereo outputs
   for (int s = 0; s < nFrames; ++s)

@@ -32,4 +32,39 @@ inline void CopyMonoToStereoReverbInputs(const float* monoFoldDown, double* reve
     reverbInR[s] = mono;
   }
 }
+
+template <typename SampleT>
+inline void FoldDownToMono(SampleT* const* inputs, int nInChans, float* monoFoldDown, int nFrames)
+{
+  if (nInChans <= 0)
+  {
+    for (int s = 0; s < nFrames; ++s)
+      monoFoldDown[s] = 0.f;
+
+    return;
+  }
+
+  if (nInChans == 1)
+  {
+    for (int s = 0; s < nFrames; ++s)
+      monoFoldDown[s] = static_cast<float>(inputs[0][s]);
+
+    return;
+  }
+
+  for (int s = 0; s < nFrames; ++s)
+  {
+    double mono = 0.0;
+    for (int c = 0; c < nInChans; ++c)
+      mono += static_cast<double>(inputs[c][s]);
+
+    monoFoldDown[s] = static_cast<float>(mono / static_cast<double>(nInChans));
+  }
+}
+
+inline void CollapseStereoReverbToMono(const double* reverbOutL, const double* reverbOutR, float* wetMono, int nFrames)
+{
+  for (int s = 0; s < nFrames; ++s)
+    wetMono[s] = static_cast<float>(0.5 * (reverbOutL[s] + reverbOutR[s]));
+}
 } // namespace spatialtail

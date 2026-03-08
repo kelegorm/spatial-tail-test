@@ -26,6 +26,54 @@ bool TestMonoCopyContract()
   return true;
 }
 
+bool TestInputFoldDownContract()
+{
+  std::vector<float> ch0 = {1.0f, -1.0f, 0.5f, 0.0f};
+  std::vector<float> ch1 = {0.0f, 1.0f, -0.5f, 1.0f};
+  std::vector<float> mono(ch0.size(), 0.f);
+
+  float* stereoInputs[2] = {
+    ch0.data(),
+    ch1.data()
+  };
+
+  spatialtail::FoldDownToMono(stereoInputs, 2, mono.data(), static_cast<int>(mono.size()));
+
+  for (size_t i = 0; i < mono.size(); ++i)
+  {
+    const float expected = 0.5f * (ch0[i] + ch1[i]);
+    if (std::fabs(mono[i] - expected) > static_cast<float>(kEpsilon)) return false;
+  }
+
+  std::fill(mono.begin(), mono.end(), 0.f);
+  float* monoInput[1] = {ch0.data()};
+  spatialtail::FoldDownToMono(monoInput, 1, mono.data(), static_cast<int>(mono.size()));
+
+  for (size_t i = 0; i < mono.size(); ++i)
+  {
+    if (std::fabs(mono[i] - ch0[i]) > static_cast<float>(kEpsilon)) return false;
+  }
+
+  return true;
+}
+
+bool TestReverbOutputCollapseContract()
+{
+  const std::vector<double> reverbL = {1.0, -0.5, 0.25, -1.0};
+  const std::vector<double> reverbR = {-1.0, -0.5, 0.75, 1.0};
+  std::vector<float> wetMono(reverbL.size(), 0.f);
+
+  spatialtail::CollapseStereoReverbToMono(reverbL.data(), reverbR.data(), wetMono.data(), static_cast<int>(wetMono.size()));
+
+  for (size_t i = 0; i < wetMono.size(); ++i)
+  {
+    const double expected = 0.5 * (reverbL[i] + reverbR[i]);
+    if (std::fabs(static_cast<double>(wetMono[i]) - expected) > kEpsilon) return false;
+  }
+
+  return true;
+}
+
 bool TestReverbDefaultsInExpectedRange()
 {
   return spatialtail::kReverbDefaultRoomSize > 0.0 && spatialtail::kReverbDefaultRoomSize < 1.0
@@ -75,9 +123,21 @@ bool TestResetClearsTail()
 
 int main()
 {
+  if (!TestInputFoldDownContract())
+  {
+    std::cerr << "TestInputFoldDownContract failed\n";
+    return 1;
+  }
+
   if (!TestMonoCopyContract())
   {
     std::cerr << "TestMonoCopyContract failed\n";
+    return 1;
+  }
+
+  if (!TestReverbOutputCollapseContract())
+  {
+    std::cerr << "TestReverbOutputCollapseContract failed\n";
     return 1;
   }
 

@@ -37,6 +37,7 @@ private:
   std::vector<double> mReverbInR;
   std::vector<double> mReverbOutL;
   std::vector<double> mReverbOutR;
+  std::vector<float> mReverbWetMono;
   std::vector<float> mHrtfL;
   std::vector<float> mHrtfR;
   float mSmoothedDistanceGain = 1.f;
