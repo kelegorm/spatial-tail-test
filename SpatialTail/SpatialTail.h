@@ -3,6 +3,7 @@
 #include "IPlug_include_in_plug_hdr.h"
 #include "HRTFProcessor.h"
 #include "ReverbStage.h"
+#include <limits>
 #include <vector>
 
 const int kNumPresets = 1;
@@ -50,6 +51,12 @@ private:
   float mSmoothedDistanceGain = 1.f;
   float mSmoothedReverbRoomSize = static_cast<float>(spatialtail::kReverbDefaultRoomSize);
   float mSmoothedReverbDamping = static_cast<float>(spatialtail::kReverbDefaultDamping);
+  float mAppliedReverbRoomSize = std::numeric_limits<float>::quiet_NaN();
+  float mAppliedReverbDamping = std::numeric_limits<float>::quiet_NaN();
   float mDistanceSmoothCoeff  = 0.f;
   double mLastSampleRate = 0.0;
+#if !defined(NDEBUG)
+  float mDebugLastReverbRoomTarget = std::numeric_limits<float>::quiet_NaN();
+  float mDebugLastReverbDampingTarget = std::numeric_limits<float>::quiet_NaN();
+#endif
 };

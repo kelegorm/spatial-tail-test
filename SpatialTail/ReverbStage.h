@@ -17,6 +17,7 @@ constexpr double kReverbRoomMax = 0.99;
 constexpr double kReverbDampingMin = 0.0;
 constexpr double kReverbDampingMax = 1.0;
 constexpr double kAutomationSmoothingTimeSeconds = 0.02;
+constexpr float kReverbTuningApplyEpsilon = 1.0e-6f;
 constexpr double kReverbLatencyDetectThreshold = 1.0e-12;
 constexpr double kReverbTailDetectThreshold = 1.0e-6;
 constexpr double kReverbTailMaxProbeSeconds = 20.0;
@@ -51,6 +52,36 @@ inline void ApplyReverbTuning(WDL_ReverbEngine& reverb, float roomSize, float da
 {
   reverb.SetRoomSize(ClampReverbRoomSize(roomSize));
   reverb.SetDampening(ClampReverbDamping(damping));
+}
+
+inline bool ShouldUpdateReverbTuning(float appliedRoomSize, float appliedDamping,
+                                     float candidateRoomSize, float candidateDamping,
+                                     float epsilon = kReverbTuningApplyEpsilon)
+{
+  if (!std::isfinite(appliedRoomSize) || !std::isfinite(appliedDamping))
+    return true;
+
+  return std::fabs(candidateRoomSize - appliedRoomSize) > epsilon
+      || std::fabs(candidateDamping - appliedDamping) > epsilon;
+}
+
+inline bool ApplyReverbTuningRuntime(WDL_ReverbEngine& reverb, float roomSize, float damping,
+                                     float& appliedRoomSize, float& appliedDamping)
+{
+  const float clampedRoom = ClampReverbRoomSize(roomSize);
+  const float clampedDamping = ClampReverbDamping(damping);
+
+  if (!ShouldUpdateReverbTuning(appliedRoomSize, appliedDamping, clampedRoom, clampedDamping))
+    return false;
+
+  // WDL_ReverbEngine latches room/damping into comb filters on Reset().
+  // Reset(false) updates coefficients without clearing the wet tail state.
+  reverb.SetRoomSize(clampedRoom);
+  reverb.SetDampening(clampedDamping);
+  reverb.Reset(false);
+  appliedRoomSize = clampedRoom;
+  appliedDamping = clampedDamping;
+  return true;
 }
 
 inline void ResetReverb(WDL_ReverbEngine& reverb, double sampleRate)

@@ -42,3 +42,12 @@ Listening notes (manual, outside ralphex task checkboxes):
 - [x] Force HRTF load failure in Debug (e.g., invalid SOFA path) and confirm fallback avoids unintended gain boost or clipping
 - [x] Rebuild and run validation commands
 - [x] Mark completed
+
+### Task 6: Fix regression where Room/Damping knobs do not audibly change wet signal
+- [x] Reproduce and document the bug with an objective case (impulse and pink-noise input): capture wet-only output for `Room=0.0` vs `Room=0.99` and `Damping=0.0` vs `Damping=1.0`
+- [x] Audit parameter flow end-to-end (`GetParam` -> smoothing -> `ApplyReverbTuning` -> `WDL_ReverbEngine` processing) and identify where values are lost or overridden
+- [x] Ensure reverb tuning updates are applied at runtime without accidental reset/default re-application in `OnReset()` or per-block processing
+- [x] Add/extend `SpatialTail/tests/reverb_stage_tests.cpp` so tests fail if changing `Room` or `Damping` does not measurably change wet output metrics (energy envelope / high-frequency content)
+- [x] Add a fast debug assertion/log guard (Debug-only) that verifies reverb engine receives changed room/damping values when host automation moves knobs
+- [x] Rebuild and run validation commands plus reverb-stage tests
+- [x] Manual listening verification in host: with `kDryWet=1.0`, both knobs produce clearly audible tail/tone changes across full range

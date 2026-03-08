@@ -1,15 +1,134 @@
 #include "ReverbStage.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
 namespace
 {
 constexpr double kEpsilon = 1.0e-9;
+constexpr int kReverbMetricTestBlockSize = 256;
+constexpr int kReverbMetricTestBlocks = 120;
+
+struct WetMetrics
+{
+  double rms = 0.0;
+  double hfRatio = 0.0;
+  double envelopeMean = 0.0;
+};
+
+uint32_t XorShift32(uint32_t& state)
+{
+  uint32_t x = state;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  state = x;
+  return x;
+}
+
+std::vector<float> MakeImpulseSignal(int sampleCount)
+{
+  std::vector<float> signal(static_cast<size_t>(sampleCount), 0.f);
+  if (!signal.empty())
+    signal.front() = 1.f;
+  return signal;
+}
+
+std::vector<float> MakePinkNoiseSignal(int sampleCount)
+{
+  std::vector<float> signal(static_cast<size_t>(sampleCount), 0.f);
+  uint32_t rng = 0x12345678u;
+  double b0 = 0.0;
+  double b1 = 0.0;
+  double b2 = 0.0;
+  double b3 = 0.0;
+  double b4 = 0.0;
+  double b5 = 0.0;
+  double b6 = 0.0;
+
+  for (float& sample : signal)
+  {
+    const double white = (static_cast<double>(XorShift32(rng) & 0x00FFFFFFu) / 8388608.0) - 1.0;
+    b0 = 0.99886 * b0 + white * 0.0555179;
+    b1 = 0.99332 * b1 + white * 0.0750759;
+    b2 = 0.96900 * b2 + white * 0.1538520;
+    b3 = 0.86650 * b3 + white * 0.3104856;
+    b4 = 0.55000 * b4 + white * 0.5329522;
+    b5 = -0.7616 * b5 - white * 0.0168980;
+    const double pink = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+    b6 = white * 0.115926;
+    sample = static_cast<float>(std::max(-1.0, std::min(1.0, pink)));
+  }
+
+  return signal;
+}
+
+WetMetrics MeasureWetMetrics(const std::vector<float>& monoSignal, float room, float damping, bool useRuntimeApply)
+{
+  WDL_ReverbEngine reverb;
+  spatialtail::ResetReverb(reverb, 48000.0);
+  if (useRuntimeApply)
+  {
+    float appliedRoom = std::numeric_limits<float>::quiet_NaN();
+    float appliedDamping = std::numeric_limits<float>::quiet_NaN();
+    spatialtail::ApplyReverbTuningRuntime(reverb, room, damping, appliedRoom, appliedDamping);
+  }
+  else
+  {
+    spatialtail::ApplyReverbTuning(reverb, room, damping);
+  }
+
+  std::vector<double> inL(kReverbMetricTestBlockSize, 0.0);
+  std::vector<double> inR(kReverbMetricTestBlockSize, 0.0);
+  std::vector<double> outL(kReverbMetricTestBlockSize, 0.0);
+  std::vector<double> outR(kReverbMetricTestBlockSize, 0.0);
+  std::vector<float> wetMono;
+  wetMono.reserve(monoSignal.size());
+
+  for (int block = 0; block < kReverbMetricTestBlocks; ++block)
+  {
+    for (int i = 0; i < kReverbMetricTestBlockSize; ++i)
+    {
+      const float x = monoSignal[static_cast<size_t>(block * kReverbMetricTestBlockSize + i)];
+      inL[i] = static_cast<double>(x);
+      inR[i] = static_cast<double>(x);
+    }
+
+    reverb.ProcessSampleBlock(inL.data(), inR.data(), outL.data(), outR.data(), kReverbMetricTestBlockSize);
+    for (int i = 0; i < kReverbMetricTestBlockSize; ++i)
+      wetMono.push_back(static_cast<float>(0.5 * (outL[i] + outR[i])));
+  }
+
+  WetMetrics metrics;
+  double energy = 0.0;
+  double diffEnergy = 0.0;
+  double previous = 0.0;
+  double envelopeAccumulator = 0.0;
+  constexpr int kEnvelopeWindow = 128;
+  for (size_t i = 0; i < wetMono.size(); ++i)
+  {
+    const double v = wetMono[i];
+    energy += v * v;
+    const double diff = v - previous;
+    diffEnergy += diff * diff;
+    previous = v;
+    envelopeAccumulator += std::fabs(v);
+    if ((i + 1) % static_cast<size_t>(kEnvelopeWindow) == 0)
+      metrics.envelopeMean += envelopeAccumulator / static_cast<double>(kEnvelopeWindow);
+  }
+
+  const double sampleCount = static_cast<double>(wetMono.size());
+  metrics.rms = std::sqrt(energy / sampleCount);
+  metrics.hfRatio = diffEnergy / std::max(energy, 1.0e-18);
+  metrics.envelopeMean /= std::max(1.0, sampleCount / static_cast<double>(kEnvelopeWindow));
+  return metrics;
+}
 
 bool TestMonoCopyContract()
 {
@@ -291,6 +410,93 @@ bool TestFallbackGainAndClippingGuard()
 
   return true;
 }
+
+bool TestRuntimeTuningApplyGuard()
+{
+  WDL_ReverbEngine reverb;
+  spatialtail::ResetReverb(reverb, 48000.0);
+
+  float appliedRoom = std::numeric_limits<float>::quiet_NaN();
+  float appliedDamping = std::numeric_limits<float>::quiet_NaN();
+  if (!spatialtail::ApplyReverbTuningRuntime(reverb, 0.62f, 0.17f, appliedRoom, appliedDamping))
+    return false;
+
+  if (std::fabs(appliedRoom - 0.62f) > static_cast<float>(kEpsilon))
+    return false;
+  if (std::fabs(appliedDamping - 0.17f) > static_cast<float>(kEpsilon))
+    return false;
+
+  if (spatialtail::ApplyReverbTuningRuntime(reverb, 0.62f, 0.17f, appliedRoom, appliedDamping))
+    return false;
+
+  if (!spatialtail::ApplyReverbTuningRuntime(reverb, 0.63f, 0.17f, appliedRoom, appliedDamping))
+    return false;
+
+  return true;
+}
+
+bool TestReverbTuningBugReproductionWithoutReset()
+{
+  const int totalSamples = kReverbMetricTestBlockSize * kReverbMetricTestBlocks;
+  const auto impulse = MakeImpulseSignal(totalSamples);
+  const auto pink = MakePinkNoiseSignal(totalSamples);
+
+  const auto impulseRoomLow = MeasureWetMetrics(impulse, 0.0f, 0.3f, false);
+  const auto impulseRoomHigh = MeasureWetMetrics(impulse, 0.99f, 0.3f, false);
+  const auto impulseDampLow = MeasureWetMetrics(impulse, 0.72f, 0.0f, false);
+  const auto impulseDampHigh = MeasureWetMetrics(impulse, 0.72f, 1.0f, false);
+  const auto pinkRoomLow = MeasureWetMetrics(pink, 0.0f, 0.3f, false);
+  const auto pinkRoomHigh = MeasureWetMetrics(pink, 0.99f, 0.3f, false);
+  const auto pinkDampLow = MeasureWetMetrics(pink, 0.72f, 0.0f, false);
+  const auto pinkDampHigh = MeasureWetMetrics(pink, 0.72f, 1.0f, false);
+
+  const double kExpectedNoChange = 1.0e-12;
+  if (std::fabs(impulseRoomLow.rms - impulseRoomHigh.rms) > kExpectedNoChange) return false;
+  if (std::fabs(impulseRoomLow.hfRatio - impulseRoomHigh.hfRatio) > kExpectedNoChange) return false;
+  if (std::fabs(impulseRoomLow.envelopeMean - impulseRoomHigh.envelopeMean) > kExpectedNoChange) return false;
+
+  if (std::fabs(impulseDampLow.rms - impulseDampHigh.rms) > kExpectedNoChange) return false;
+  if (std::fabs(impulseDampLow.hfRatio - impulseDampHigh.hfRatio) > kExpectedNoChange) return false;
+  if (std::fabs(impulseDampLow.envelopeMean - impulseDampHigh.envelopeMean) > kExpectedNoChange) return false;
+
+  if (std::fabs(pinkRoomLow.rms - pinkRoomHigh.rms) > kExpectedNoChange) return false;
+  if (std::fabs(pinkRoomLow.hfRatio - pinkRoomHigh.hfRatio) > kExpectedNoChange) return false;
+  if (std::fabs(pinkRoomLow.envelopeMean - pinkRoomHigh.envelopeMean) > kExpectedNoChange) return false;
+
+  if (std::fabs(pinkDampLow.rms - pinkDampHigh.rms) > kExpectedNoChange) return false;
+  if (std::fabs(pinkDampLow.hfRatio - pinkDampHigh.hfRatio) > kExpectedNoChange) return false;
+  if (std::fabs(pinkDampLow.envelopeMean - pinkDampHigh.envelopeMean) > kExpectedNoChange) return false;
+
+  return true;
+}
+
+bool TestRuntimeTuningChangesWetMetrics()
+{
+  const int totalSamples = kReverbMetricTestBlockSize * kReverbMetricTestBlocks;
+  const auto impulse = MakeImpulseSignal(totalSamples);
+  const auto pink = MakePinkNoiseSignal(totalSamples);
+
+  const auto impulseRoomLow = MeasureWetMetrics(impulse, 0.0f, 0.3f, true);
+  const auto impulseRoomHigh = MeasureWetMetrics(impulse, 0.99f, 0.3f, true);
+  const auto impulseDampLow = MeasureWetMetrics(impulse, 0.72f, 0.0f, true);
+  const auto impulseDampHigh = MeasureWetMetrics(impulse, 0.72f, 1.0f, true);
+  const auto pinkRoomLow = MeasureWetMetrics(pink, 0.0f, 0.3f, true);
+  const auto pinkRoomHigh = MeasureWetMetrics(pink, 0.99f, 0.3f, true);
+  const auto pinkDampLow = MeasureWetMetrics(pink, 0.72f, 0.0f, true);
+  const auto pinkDampHigh = MeasureWetMetrics(pink, 0.72f, 1.0f, true);
+
+  if (std::fabs(impulseRoomLow.envelopeMean - impulseRoomHigh.envelopeMean) < 0.05)
+    return false;
+  if (std::fabs(pinkRoomLow.rms - pinkRoomHigh.rms) < 0.01)
+    return false;
+
+  if (std::fabs(impulseDampLow.hfRatio - impulseDampHigh.hfRatio) < 0.05)
+    return false;
+  if (std::fabs(pinkDampLow.hfRatio - pinkDampHigh.hfRatio) < 0.02)
+    return false;
+
+  return true;
+}
 } // namespace
 
 int main()
@@ -358,6 +564,24 @@ int main()
   if (!TestFallbackGainAndClippingGuard())
   {
     std::cerr << "TestFallbackGainAndClippingGuard failed\n";
+    return 1;
+  }
+
+  if (!TestRuntimeTuningApplyGuard())
+  {
+    std::cerr << "TestRuntimeTuningApplyGuard failed\n";
+    return 1;
+  }
+
+  if (!TestReverbTuningBugReproductionWithoutReset())
+  {
+    std::cerr << "TestReverbTuningBugReproductionWithoutReset failed\n";
+    return 1;
+  }
+
+  if (!TestRuntimeTuningChangesWetMetrics())
+  {
+    std::cerr << "TestRuntimeTuningChangesWetMetrics failed\n";
     return 1;
   }
 
