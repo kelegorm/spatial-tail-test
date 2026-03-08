@@ -88,6 +88,22 @@ private:
   int mCrossfadeLengthSamples = 0;
   int mCrossfadeRemaining = 0;
 
+  // ITD fractional delay buffers (Task 4).
+  // Processing order: FIR convolution first (spectral HRTF shaping), then per-ear
+  // delay (interaural time difference). Delay values from SOFA are in seconds;
+  // they are converted to samples at process() time using mSampleRate.
+  //
+  // kMaxITDDelaySamples must exceed the largest ITD the SOFA data can produce.
+  // Physical maximum for a human head (~0.09 m radius): ~660 µs ≈ 127 samples at
+  // 192 kHz. 256 samples provides a safe margin for any reasonable SOFA file.
+  static constexpr int kMaxITDDelaySamples = 256;
+
+  float mSampleRate = 44100.f;         // stored at load() for seconds→samples conversion
+  std::vector<float> mDelayBufL;       // per-ear circular delay line (left)
+  std::vector<float> mDelayBufR;       // per-ear circular delay line (right)
+  int mDelayPosL = 0;                  // current write position in mDelayBufL
+  int mDelayPosR = 0;                  // current write position in mDelayBufR
+
 #ifndef NDEBUG
 public:
   // Accessible from tests and host code; not present in Release builds.

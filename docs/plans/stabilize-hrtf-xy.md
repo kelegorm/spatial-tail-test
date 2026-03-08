@@ -46,13 +46,13 @@ Goal:
 
 ### Task 4: Apply libmysofa ITD delays instead of ignoring them
 Note: this task in isolation may sound worse than current behavior because ITD will jump without crossfade smoothing. This is expected and resolved in Task 5.
-- [ ] Stop discarding `delayL` and `delayR` returned by `mysofa_getfilter_float`
-- [ ] Implement a small realtime-safe per-ear fractional delay stage suitable for HRTF ITD
-- [ ] Integrate the delay stage into the HRTF render path in the correct order relative to FIR processing
-- [ ] Clamp and validate delay values defensively to avoid invalid reads or overruns
-- [ ] Add clear code comments describing delay units and processing order
-- [ ] Confirm ITD delay test from Task 3 passes
-- [ ] Mark completed
+- [x] Stop discarding `delayL` and `delayR` returned by `mysofa_getfilter_float`
+- [x] Implement a small realtime-safe per-ear fractional delay stage suitable for HRTF ITD
+- [x] Integrate the delay stage into the HRTF render path in the correct order relative to FIR processing
+- [x] Clamp and validate delay values defensively to avoid invalid reads or overruns
+- [x] Add clear code comments describing delay units and processing order
+- [x] Confirm ITD delay test from Task 3 passes
+- [x] Mark completed
 
 ### Task 5: Replace abrupt IR switching with short transition smoothing
 - [ ] Stop hard-switching HRTF filters on each block update

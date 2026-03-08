@@ -57,6 +57,14 @@ bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
   mCrossfadeLengthSamples = kDefaultCrossfadeSamples;
   mCrossfadeRemaining = 0;
 
+  // ITD delay buffers: preallocated here, never resized on the audio thread.
+  // kMaxITDDelaySamples is sized conservatively (see header for rationale).
+  mSampleRate = sampleRate;
+  mDelayBufL.assign(kMaxITDDelaySamples, 0.f);
+  mDelayBufR.assign(kMaxITDDelaySamples, 0.f);
+  mDelayPosL = 0;
+  mDelayPosR = 0;
+
   mTargetPending = false;
 
   return true;
@@ -141,7 +149,6 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
 #ifndef NDEBUG
   // Acknowledge bypass flags consumed by future tasks so the compiler does not
   // warn about unused fields in builds where those tasks are not yet active.
-  (void)mDebug.disableITD;
   (void)mDebug.disableSmoothing;
 #endif
 
@@ -169,6 +176,8 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
   }
 
   // Time-domain FIR convolution using mCurrentState IRs and the circular input buffer.
+  // Processing order: FIR (spectral HRTF shaping) is applied first; the per-ear ITD
+  // delay stage below then time-shifts each channel independently.
   const int N = mFilterLength;
   for (int i = 0; i < nFrames; ++i)
   {
@@ -186,5 +195,61 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
     outR[i] = sumR;
 
     mBufPos = (mBufPos + 1) % N;
+  }
+
+  // Apply ITD (interaural time difference) delay per ear.
+  //
+  // Delay values in mCurrentState.delayL/R are in seconds (from SOFA via
+  // mysofa_getfilter_float). They are converted to fractional samples here using
+  // mSampleRate. Linear interpolation provides sub-sample accuracy without
+  // requiring allpass filters or heap allocation.
+  //
+  // Clamping: delay is clamped to [0, kMaxITDDelaySamples - 2] so that both
+  // the integer read tap and the (integer+1) interpolation tap stay within the
+  // preallocated delay buffer. Negative values are not expected from a valid
+  // SOFA file (asserted in lookupTarget) but are clamped defensively.
+
+#ifndef NDEBUG
+  const bool applyITD = !mDebug.disableITD;
+#else
+  constexpr bool applyITD = true;
+#endif
+
+  if (applyITD)
+  {
+    // Convert seconds → fractional samples; clamp to buffer bounds.
+    // The upper bound leaves one extra slot so the interpolation tap (int+1) is safe.
+    const float maxDelaySamples = static_cast<float>(kMaxITDDelaySamples - 2);
+
+    const float rawL = mCurrentState.delayL * mSampleRate;
+    const float rawR = mCurrentState.delayR * mSampleRate;
+    const float clampedL = rawL < 0.f ? 0.f : (rawL > maxDelaySamples ? maxDelaySamples : rawL);
+    const float clampedR = rawR < 0.f ? 0.f : (rawR > maxDelaySamples ? maxDelaySamples : rawR);
+
+    const int   intL  = static_cast<int>(clampedL);
+    const float fracL = clampedL - static_cast<float>(intL);
+    const int   intR  = static_cast<int>(clampedR);
+    const float fracR = clampedR - static_cast<float>(intR);
+
+    for (int i = 0; i < nFrames; ++i)
+    {
+      // Write FIR output into per-ear delay line, then read back with delay offset.
+      // Linear interpolation: output = (1-frac)*buf[pos-int] + frac*buf[pos-int-1].
+      mDelayBufL[mDelayPosL] = outL[i];
+      {
+        const int r0 = (mDelayPosL - intL     + kMaxITDDelaySamples) % kMaxITDDelaySamples;
+        const int r1 = (mDelayPosL - intL - 1 + kMaxITDDelaySamples) % kMaxITDDelaySamples;
+        outL[i] = (1.f - fracL) * mDelayBufL[r0] + fracL * mDelayBufL[r1];
+      }
+      mDelayPosL = (mDelayPosL + 1) % kMaxITDDelaySamples;
+
+      mDelayBufR[mDelayPosR] = outR[i];
+      {
+        const int r0 = (mDelayPosR - intR     + kMaxITDDelaySamples) % kMaxITDDelaySamples;
+        const int r1 = (mDelayPosR - intR - 1 + kMaxITDDelaySamples) % kMaxITDDelaySamples;
+        outR[i] = (1.f - fracR) * mDelayBufR[r0] + fracR * mDelayBufR[r1];
+      }
+      mDelayPosR = (mDelayPosR + 1) % kMaxITDDelaySamples;
+    }
   }
 }
