@@ -50,6 +50,12 @@
 		4F3862F12014BBEC0009F402 /* SpatialTail.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */; };
 		AA00DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
 		AA00FEED2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
+		AA01DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
+		AA02DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
+		AA03DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
+		AA04DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
+		AA05DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
+		AA06DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
 		4F3862F22014BBEC0009F402 /* SpatialTail.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */; };
 		4F3862F32014BBEC0009F402 /* SpatialTail.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */; };
 		4F3EE1BF231438D000004786 /* SpatialTail.icns in Resources */ = {isa = PBXBuildFile; fileRef = 4FD290A8137C34D700CEBE7E /* SpatialTail.icns */; };
@@ -2296,6 +2302,7 @@
 				4F8C10E120BA2796006320CD /* IGraphicsEditorDelegate.cpp in Sources */,
 				4F6369DE20A464BB0022C370 /* IGraphicsNanoVG_src.m in Sources */,
 				4F8D9707209EF5AC006E2A11 /* SpatialTail.cpp in Sources */,
+				AA01DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 				4F78D9BB13B63BA50032E0F3 /* IPlugAPIBase.cpp in Sources */,
 				4FB1F59020E4B010004157C8 /* IGraphicsMac_view.mm in Sources */,
 				4F993F7223055C96000313AF /* IPlugProcessor.cpp in Sources */,
@@ -2337,6 +2344,7 @@
 				4F78D95C13B63BA50032E0F3 /* IPlugParameter.cpp in Sources */,
 				4FB1F58C20E4B006004157C8 /* IGraphicsMac.mm in Sources */,
 				4F3862F22014BBEC0009F402 /* SpatialTail.cpp in Sources */,
+				AA02DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2371,6 +2379,7 @@
 				4F3EE1DC231438D000004786 /* IControls.cpp in Sources */,
 				4F3EE1DD231438D000004786 /* IGraphicsMac.mm in Sources */,
 				4F3EE1DE231438D000004786 /* SpatialTail.cpp in Sources */,
+				AA03DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 				4F3EE1DF231438D000004786 /* IPopupMenuControl.cpp in Sources */,
 				4F3EE1E0231438D000004786 /* IPlugAPIBase.cpp in Sources */,
 				4F3EE1E1231438D000004786 /* IPlugPluginBase.cpp in Sources */,
@@ -2388,6 +2397,7 @@
 				4F78BE1422E7406D00AD537E /* SpatialTail.h in Sources */,
 				4F0D965C23099F6900BFDED0 /* IPlugProcessor.cpp in Sources */,
 				4F78BE1522E7406D00AD537E /* SpatialTail.cpp in Sources */,
+				AA04DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 				4F78BE1622E7406D00AD537E /* IGraphicsMac_view.mm in Sources */,
 				4F78BE1722E7406D00AD537E /* IGraphicsMac.mm in Sources */,
 				4F78BE1822E7406D00AD537E /* IGraphicsCoreText.mm in Sources */,
@@ -2485,6 +2495,7 @@
 				4F0848292015129A00F9E881 /* IPlugAAX_Parameters.cpp in Sources */,
 				4FB1F59420E4B014004157C8 /* IGraphicsMac_view.mm in Sources */,
 				4F3862F32014BBEC0009F402 /* SpatialTail.cpp in Sources */,
+				AA05DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 				4FCE29DB21D6ED70004BCBA1 /* ITextEntryControl.cpp in Sources */,
 				4FB600231567CB0A0020189A /* IPlugParameter.cpp in Sources */,
 				4FB600261567CB0A0020189A /* AAX_Exports.cpp in Sources */,
@@ -2525,6 +2536,7 @@
 				4F63696D20A463090022C370 /* IControls.cpp in Sources */,
 				4FB1F58920E4B004004157C8 /* IGraphicsMac.mm in Sources */,
 				4F3862EF2014BBEC0009F402 /* SpatialTail.cpp in Sources */,
+				AA06DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 				4F9A82F7213DE80400BE63A4 /* IPopupMenuControl.cpp in Sources */,
 				4F78D90B13B63BA50032E0F3 /* IPlugAPIBase.cpp in Sources */,
 				4F35DEAD207E5C5A00867D8F /* IPlugPluginBase.cpp in Sources */,

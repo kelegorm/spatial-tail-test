@@ -1,7 +1,6 @@
 #include "SpatialTail.h"
 #include "IPlug_include_in_plug_src.h"
 #include "IControls.h"
-#include <vector>
 
 // Path to the SOFA file used for development (absolute path, prototype only)
 #ifndef DEFAULT_SOFA_PATH
@@ -68,6 +67,11 @@ void SpatialTail::OnReset()
 {
   if (!mHRTF.load(DEFAULT_SOFA_PATH, static_cast<float>(GetSampleRate())))
     DBGMSG("HRTFProcessor: failed to load SOFA file: %s\n", DEFAULT_SOFA_PATH);
+
+  const int blockSize = GetBlockSize();
+  mMonoIn.assign(blockSize, 0.f);
+  mHrtfL.assign(blockSize, 0.f);
+  mHrtfR.assign(blockSize, 0.f);
 }
 
 void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
@@ -79,28 +83,22 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
   // Sum stereo input to mono (only 1 input channel configured, but guard anyway)
   const int nInChans = NInChansConnected();
-  static thread_local std::vector<float> monoIn;
-  monoIn.assign(nFrames, 0.f);
+  std::fill(mMonoIn.begin(), mMonoIn.begin() + nFrames, 0.f);
 
   if (nInChans >= 1)
   {
     for (int s = 0; s < nFrames; ++s)
-      monoIn[s] = static_cast<float>(inputs[0][s]);
+      mMonoIn[s] = static_cast<float>(inputs[0][s]);
   }
 
-  // HRTF process into temporary stereo buffers
-  static thread_local std::vector<float> hrtfL, hrtfR;
-  hrtfL.resize(nFrames);
-  hrtfR.resize(nFrames);
-
-  mHRTF.process(monoIn.data(), hrtfL.data(), hrtfR.data(), nFrames, azimuth, elevation, distance);
+  mHRTF.process(mMonoIn.data(), mHrtfL.data(), mHrtfR.data(), nFrames, azimuth, elevation, distance);
 
   // Mix dry mono + wet binaural into stereo outputs
   for (int s = 0; s < nFrames; ++s)
   {
-    const float dry = monoIn[s] * (1.f - dryWet);
-    outputs[0][s] = static_cast<sample>(dry + hrtfL[s] * dryWet);
-    outputs[1][s] = static_cast<sample>(dry + hrtfR[s] * dryWet);
+    const float dry = mMonoIn[s] * (1.f - dryWet);
+    outputs[0][s] = static_cast<sample>(dry + mHrtfL[s] * dryWet);
+    outputs[1][s] = static_cast<sample>(dry + mHrtfR[s] * dryWet);
   }
 }
 #endif

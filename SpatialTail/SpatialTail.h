@@ -2,6 +2,7 @@
 
 #include "IPlug_include_in_plug_hdr.h"
 #include "HRTFProcessor.h"
+#include <vector>
 
 const int kNumPresets = 1;
 
@@ -29,4 +30,7 @@ public:
 
 private:
   HRTFProcessor mHRTF;
+  std::vector<float> mMonoIn;
+  std::vector<float> mHrtfL;
+  std::vector<float> mHrtfR;
 };
