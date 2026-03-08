@@ -61,7 +61,7 @@ Signal flow: host input -> mono fold-down -> reverb engine -> wet mono -> HRTFPr
 - SOFA file path: controlled by DEFAULT_SOFA_PATH macro (SpatialTail.cpp); currently an absolute dev path, prototype only
 - Parameters: kAzimuth (-90..90 deg), kElevation (-90..90 deg), kDistance (0.1..10 m), kDryWet (0..1), kReverbRoomSize (0.0..0.99), kReverbDamping (0.0..1.0)
 - Channel IO: "1-2" (mono in, stereo out)
-- Host contract: plugin reports measured latency (`SetLatency`) and conservative tail length (`SetTailSize`) from reverb timing probe
+- Host contract: plugin reports realtime-safe estimated latency (`SetLatency`) and conservative finite tail length (`SetTailSize`)
 - ITD delays from libmysofa are read but intentionally not applied (MVP limitation)
 
 ## Review Automation

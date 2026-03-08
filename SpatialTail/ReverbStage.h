@@ -24,6 +24,7 @@ constexpr double kReverbLatencyDetectThreshold = 1.0e-12;
 constexpr double kReverbTailDetectThreshold = 1.0e-6;
 constexpr double kReverbTailMaxProbeSeconds = 20.0;
 constexpr double kReverbTailSilenceWindowSeconds = 0.25;
+constexpr double kRealtimeSafeLatencySeconds = 1214.0 / 48000.0;
 constexpr const char* kForceHRTFLoadFailureEnvVar = "SPATIALTAIL_DEBUG_FORCE_HRTF_LOAD_FAILURE";
 constexpr const char* kForcedInvalidSofaPath = "/__spatialtail__/forced-invalid.sofa";
 
@@ -219,6 +220,34 @@ inline void FillStereoFromFallbackWetMono(const float* wetMono, float* outL, flo
   }
 }
 
+template <typename SampleT, typename OutputT>
+inline void FillStereoFromInputFoldDownFallback(SampleT* const* inputs, int nInChans, OutputT* outL, OutputT* outR, int nFrames)
+{
+  for (int s = 0; s < nFrames; ++s)
+  {
+    double mono = 0.0;
+    int validChannels = 0;
+    if (inputs && nInChans > 0)
+    {
+      for (int c = 0; c < nInChans; ++c)
+      {
+        if (!inputs[c])
+          continue;
+
+        mono += static_cast<double>(inputs[c][s]);
+        ++validChannels;
+      }
+    }
+
+    if (validChannels > 0)
+      mono /= static_cast<double>(validChannels);
+
+    const float clamped = ClampAudioSample(static_cast<float>(mono));
+    outL[s] = static_cast<OutputT>(clamped);
+    outR[s] = static_cast<OutputT>(clamped);
+  }
+}
+
 inline void PrepareMonoDelayLine(std::vector<float>& delayLine, int delaySamples, int& writePos)
 {
   if (delaySamples <= 0)
@@ -320,6 +349,19 @@ inline ReverbHostTiming MeasureReverbHostTiming(double sampleRate,
   if (timing.tailSamples < timing.latencySamples)
     timing.tailSamples = timing.latencySamples;
 
+  return timing;
+}
+
+inline ReverbHostTiming EstimateRealtimeSafeHostTiming(double sampleRate)
+{
+  ReverbHostTiming timing;
+  if (sampleRate <= 0.0)
+    return timing;
+
+  timing.latencySamples = std::max(0, static_cast<int>(std::ceil(sampleRate * kRealtimeSafeLatencySeconds)));
+  timing.tailSamples = std::max(
+      timing.latencySamples,
+      static_cast<int>(std::ceil(sampleRate * kReverbTailMaxProbeSeconds)));
   return timing;
 }
 } // namespace spatialtail

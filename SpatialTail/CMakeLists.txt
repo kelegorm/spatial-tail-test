@@ -1,10 +1,29 @@
 cmake_minimum_required(VERSION 3.14)
 project(SpatialTail VERSION 1.0.0)
 
-# Discover IPLUG2_DIR if not already set (for independent builds)
+# Discover/repair IPLUG2_DIR for independent builds.
+set(_needs_iplug2_discovery OFF)
 if(NOT DEFINED IPLUG2_DIR)
-  set(IPLUG2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE PATH "iPlug2 root directory")
+  set(_needs_iplug2_discovery ON)
+elseif(NOT EXISTS "${IPLUG2_DIR}/iPlug2.cmake")
+  set(_needs_iplug2_discovery ON)
 endif()
+
+if(_needs_iplug2_discovery)
+  foreach(CANDIDATE_DIR
+      "${CMAKE_CURRENT_SOURCE_DIR}/../libs/iPlug2"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../iPlug2")
+    if(EXISTS "${CANDIDATE_DIR}/iPlug2.cmake")
+      set(IPLUG2_DIR "${CANDIDATE_DIR}" CACHE PATH "iPlug2 root directory" FORCE)
+      break()
+    endif()
+  endforeach()
+endif()
+
+if(NOT DEFINED IPLUG2_DIR OR NOT EXISTS "${IPLUG2_DIR}/iPlug2.cmake")
+  message(FATAL_ERROR "Unable to locate iPlug2.cmake. Set IPLUG2_DIR to your iPlug2 root.")
+endif()
+unset(_needs_iplug2_discovery)
 
 # Include iPlug2 CMake configuration
 include(${IPLUG2_DIR}/iPlug2.cmake)

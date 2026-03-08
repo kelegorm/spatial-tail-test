@@ -405,6 +405,33 @@ bool TestHostTimingMeasurement()
   return true;
 }
 
+bool TestRealtimeSafeHostTimingEstimate()
+{
+  const auto timing48k = spatialtail::EstimateRealtimeSafeHostTiming(48000.0);
+  if (timing48k.latencySamples <= 0)
+    return false;
+  if (timing48k.tailSamples < timing48k.latencySamples)
+    return false;
+  if (timing48k.tailTruncated)
+    return false;
+
+  const int expectedTail48k = static_cast<int>(std::ceil(48000.0 * spatialtail::kReverbTailMaxProbeSeconds));
+  if (timing48k.tailSamples != expectedTail48k)
+    return false;
+
+  const auto timing96k = spatialtail::EstimateRealtimeSafeHostTiming(96000.0);
+  if (timing96k.latencySamples <= timing48k.latencySamples)
+    return false;
+  if (timing96k.tailSamples <= timing48k.tailSamples)
+    return false;
+
+  const auto invalid = spatialtail::EstimateRealtimeSafeHostTiming(0.0);
+  if (invalid.latencySamples != 0 || invalid.tailSamples != 0 || invalid.tailTruncated)
+    return false;
+
+  return true;
+}
+
 bool TestDryAlignmentDelay()
 {
   std::vector<float> delayLine;
@@ -513,6 +540,40 @@ bool TestFallbackGainAndClippingGuard()
     if (std::fabs(outL[i] - expected[i]) > static_cast<float>(kEpsilon))
       return false;
     if (std::fabs(outR[i] - expected[i]) > static_cast<float>(kEpsilon))
+      return false;
+  }
+
+  return true;
+}
+
+bool TestInputFoldDownFallback()
+{
+  const std::vector<float> inputA = {1.f, -0.5f, 2.f, -2.f};
+  const std::vector<float> inputB = {0.5f, 0.5f, -4.f, 4.f};
+  const float* inputs[3] = {inputA.data(), nullptr, inputB.data()};
+
+  std::vector<float> outL(inputA.size(), 0.f);
+  std::vector<float> outR(inputA.size(), 0.f);
+  spatialtail::FillStereoFromInputFoldDownFallback(inputs, 3, outL.data(), outR.data(), static_cast<int>(outL.size()));
+
+  for (size_t i = 0; i < outL.size(); ++i)
+  {
+    const float expected = static_cast<float>(0.5 * (inputA[i] + inputB[i]));
+    if (std::fabs(outL[i] - expected) > static_cast<float>(kEpsilon))
+      return false;
+    if (std::fabs(outR[i] - expected) > static_cast<float>(kEpsilon))
+      return false;
+  }
+
+  std::vector<float> silentL(3, 1.f);
+  std::vector<float> silentR(3, 1.f);
+  spatialtail::FillStereoFromInputFoldDownFallback(static_cast<const float* const*>(nullptr), 0,
+                                                    silentL.data(), silentR.data(), 3);
+  for (int i = 0; i < 3; ++i)
+  {
+    if (std::fabs(silentL[i]) > static_cast<float>(kEpsilon))
+      return false;
+    if (std::fabs(silentR[i]) > static_cast<float>(kEpsilon))
       return false;
   }
 
@@ -681,6 +742,12 @@ int main()
     return 1;
   }
 
+  if (!TestRealtimeSafeHostTimingEstimate())
+  {
+    std::cerr << "TestRealtimeSafeHostTimingEstimate failed\n";
+    return 1;
+  }
+
   if (!TestDryAlignmentDelay())
   {
     std::cerr << "TestDryAlignmentDelay failed\n";
@@ -696,6 +763,12 @@ int main()
   if (!TestFallbackGainAndClippingGuard())
   {
     std::cerr << "TestFallbackGainAndClippingGuard failed\n";
+    return 1;
+  }
+
+  if (!TestInputFoldDownFallback())
+  {
+    std::cerr << "TestInputFoldDownFallback failed\n";
     return 1;
   }
 

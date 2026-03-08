@@ -22,7 +22,7 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
                                        spatialtail::kReverbDampingMin, spatialtail::kReverbDampingMax, 0.001, "");
 
   mReverbLatencySamples = 0;
-  mReverbTailSamples = kTailInfinite;
+  mReverbTailSamples = 0;
   SetLatency(mReverbLatencySamples);
   SetTailSize(mReverbTailSamples);
 
@@ -100,9 +100,9 @@ void SpatialTail::OnReset()
   if (sr != mLastSampleRate)
   {
     mLastSampleRate = sr;
-    const auto reverbTiming = spatialtail::MeasureReverbHostTiming(sr);
+    const auto reverbTiming = spatialtail::EstimateRealtimeSafeHostTiming(sr);
     mReverbLatencySamples = reverbTiming.latencySamples;
-    mReverbTailSamples = reverbTiming.tailTruncated ? kTailInfinite : reverbTiming.tailSamples;
+    mReverbTailSamples = reverbTiming.tailSamples;
     SetLatency(mReverbLatencySamples);
     SetTailSize(mReverbTailSamples);
 
@@ -141,15 +141,11 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   {
 #if !defined(NDEBUG)
     DBGMSG("SpatialTail DEBUG: ProcessBlock received nFrames=%d larger than prepared buffers=%d. "
-           "Outputting silence to avoid realtime heap allocation.\n",
+           "Falling back to dry mono passthrough to avoid realtime heap allocation.\n",
            nFrames, static_cast<int>(mMonoIn.size()));
     assert(false && "ProcessBlock frame count exceeded prepared buffer size.");
 #endif
-    for (int s = 0; s < nFrames; ++s)
-    {
-      outputs[0][s] = 0.;
-      outputs[1][s] = 0.;
-    }
+    spatialtail::FillStereoFromInputFoldDownFallback(inputs, NInChansConnected(), outputs[0], outputs[1], nFrames);
     return;
   }
 
