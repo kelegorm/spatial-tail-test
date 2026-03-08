@@ -27,3 +27,10 @@ iplug_add_plugin(${PROJECT_NAME}
   RESOURCES
     resources/fonts/Roboto-Regular.ttf
 )
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(reverb_stage_tests tests/reverb_stage_tests.cpp)
+  target_include_directories(reverb_stage_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  add_test(NAME reverb_stage_tests COMMAND reverb_stage_tests)
+endif()

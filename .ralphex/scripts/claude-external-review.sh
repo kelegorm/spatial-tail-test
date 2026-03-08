@@ -4,8 +4,8 @@ set -euo pipefail
 PROMPT_FILE="${1:-}"
 
 if [[ -z "$PROMPT_FILE" || ! -f "$PROMPT_FILE" ]]; then
-  echo "NO ISSUES FOUND"
-  exit 0
+  echo "ERROR: prompt file is missing or invalid: $PROMPT_FILE" >&2
+  exit 1
 fi
 
 PROMPT="$(cat "$PROMPT_FILE")"

@@ -41,14 +41,32 @@ cd ../..
 pluginval --strictness-level 5 ~/Library/Audio/Plug-Ins/VST3/SpatialTail.vst3
 ```
 
+Run standalone reverb-stage regression tests (CMake/CTest path):
+```bash
+cmake -S SpatialTail -B SpatialTail/build
+cmake --build SpatialTail/build --target reverb_stage_tests
+ctest --test-dir SpatialTail/build -R reverb_stage_tests --output-on-failure
+```
+
+Debug-only HRTF failure injection:
+```bash
+export SPATIALTAIL_DEBUG_FORCE_HRTF_LOAD_FAILURE=1
+```
+
 ## Architecture
-Signal flow: mono input → HRTFProcessor::process() → stereo L/R FIR convolution → dry/wet mix → stereo output.
+Signal flow: host input -> mono fold-down -> reverb engine -> wet mono -> HRTFProcessor::process() -> stereo wet -> dry/wet mix -> stereo output.
 
 - HRTFProcessor (SpatialTail/HRTFProcessor.h/.cpp): wraps libmysofa MYSOFA_EASY, loads a SOFA file on OnReset(), performs sample-by-sample time-domain FIR convolution using a circular input buffer (size = filter length)
+- Reverb stage (SpatialTail/ReverbStage.h): owns reverb defaults, runtime room/damping apply, host latency/tail probing, mono/stereo contracts, and dry-alignment delay helper
 - SOFA file path: controlled by DEFAULT_SOFA_PATH macro (SpatialTail.cpp); currently an absolute dev path, prototype only
-- Parameters: kAzimuth (-180..180 deg), kElevation (-90..90 deg), kDistance (0.1..10 m), kDryWet (0..1)
+- Parameters: kAzimuth (-90..90 deg), kElevation (-90..90 deg), kDistance (0.1..10 m), kDryWet (0..1), kReverbRoomSize (0.0..0.99), kReverbDamping (0.0..1.0)
 - Channel IO: "1-2" (mono in, stereo out)
+- Host contract: plugin reports measured latency (`SetLatency`) and conservative tail length (`SetTailSize`) from reverb timing probe
 - ITD delays from libmysofa are read but intentionally not applied (MVP limitation)
+
+## Review Automation
+
+- `.ralphex/scripts/claude-external-review.sh` wraps `claude -p` for external review calls and requires a valid prompt-file argument.
 
 ## Conventions
 - One task at a time, commit after each completed task

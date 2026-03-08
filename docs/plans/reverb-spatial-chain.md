@@ -51,3 +51,4 @@ Listening notes (manual, outside ralphex task checkboxes):
 - [x] Add a fast debug assertion/log guard (Debug-only) that verifies reverb engine receives changed room/damping values when host automation moves knobs
 - [x] Rebuild and run validation commands plus reverb-stage tests
 - [x] Manual listening verification in host: with `kDryWet=1.0`, both knobs produce clearly audible tail/tone changes across full range
+- [x] Mark completed

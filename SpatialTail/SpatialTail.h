@@ -55,8 +55,4 @@ private:
   float mAppliedReverbDamping = std::numeric_limits<float>::quiet_NaN();
   float mDistanceSmoothCoeff  = 0.f;
   double mLastSampleRate = 0.0;
-#if !defined(NDEBUG)
-  float mDebugLastReverbRoomTarget = std::numeric_limits<float>::quiet_NaN();
-  float mDebugLastReverbDampingTarget = std::numeric_limits<float>::quiet_NaN();
-#endif
 };

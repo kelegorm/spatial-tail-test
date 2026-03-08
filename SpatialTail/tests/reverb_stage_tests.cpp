@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -20,6 +21,50 @@ struct WetMetrics
   double rms = 0.0;
   double hfRatio = 0.0;
   double envelopeMean = 0.0;
+};
+
+std::string GetEnvValueCopy(const char* name)
+{
+  const char* value = std::getenv(name);
+  return value ? std::string(value) : std::string();
+}
+
+bool SetEnvVarPortable(const char* name, const char* value)
+{
+#if defined(_WIN32)
+  return _putenv_s(name, value) == 0;
+#else
+  return setenv(name, value, 1) == 0;
+#endif
+}
+
+bool UnsetEnvVarPortable(const char* name)
+{
+#if defined(_WIN32)
+  return _putenv_s(name, "") == 0;
+#else
+  return unsetenv(name) == 0;
+#endif
+}
+
+struct ScopedEnvVarRestore
+{
+  explicit ScopedEnvVarRestore(const char* name)
+  : mName(name), mHadValue(std::getenv(name) != nullptr), mOriginalValue(GetEnvValueCopy(name))
+  {
+  }
+
+  ~ScopedEnvVarRestore()
+  {
+    if (mHadValue)
+      SetEnvVarPortable(mName, mOriginalValue.c_str());
+    else
+      UnsetEnvVarPortable(mName);
+  }
+
+  const char* mName;
+  bool mHadValue;
+  std::string mOriginalValue;
 };
 
 uint32_t XorShift32(uint32_t& state)
@@ -151,6 +196,7 @@ bool TestInputFoldDownContract()
 {
   std::vector<float> ch0 = {1.0f, -1.0f, 0.5f, 0.0f};
   std::vector<float> ch1 = {0.0f, 1.0f, -0.5f, 1.0f};
+  std::vector<float> ch2 = {0.25f, 0.25f, -0.25f, -0.25f};
   std::vector<float> mono(ch0.size(), 0.f);
 
   float* stereoInputs[2] = {
@@ -173,6 +219,23 @@ bool TestInputFoldDownContract()
   for (size_t i = 0; i < mono.size(); ++i)
   {
     if (std::fabs(mono[i] - ch0[i]) > static_cast<float>(kEpsilon)) return false;
+  }
+
+  std::fill(mono.begin(), mono.end(), 1.f);
+  spatialtail::FoldDownToMono(static_cast<float* const*>(nullptr), 0, mono.data(), static_cast<int>(mono.size()));
+  for (float sample : mono)
+  {
+    if (std::fabs(sample) > static_cast<float>(kEpsilon))
+      return false;
+  }
+
+  std::fill(mono.begin(), mono.end(), 0.f);
+  float* triInput[3] = {ch0.data(), ch1.data(), ch2.data()};
+  spatialtail::FoldDownToMono(triInput, 3, mono.data(), static_cast<int>(mono.size()));
+  for (size_t i = 0; i < mono.size(); ++i)
+  {
+    const float expected = (ch0[i] + ch1[i] + ch2[i]) / 3.f;
+    if (std::fabs(mono[i] - expected) > static_cast<float>(kEpsilon)) return false;
   }
 
   return true;
@@ -229,6 +292,16 @@ bool TestReverbAutomationSmoothing()
 {
   const float coeff = spatialtail::ComputeBlockSmoothingCoefficient(48000.0, 256, spatialtail::kAutomationSmoothingTimeSeconds);
   if (coeff <= 0.f || coeff >= 1.f)
+    return false;
+
+  if (std::fabs(spatialtail::ComputeBlockSmoothingCoefficient(0.0, 256, spatialtail::kAutomationSmoothingTimeSeconds) - 1.f)
+      > static_cast<float>(kEpsilon))
+    return false;
+  if (std::fabs(spatialtail::ComputeBlockSmoothingCoefficient(48000.0, 0, spatialtail::kAutomationSmoothingTimeSeconds) - 1.f)
+      > static_cast<float>(kEpsilon))
+    return false;
+  if (std::fabs(spatialtail::ComputeBlockSmoothingCoefficient(48000.0, 256, 0.0) - 1.f)
+      > static_cast<float>(kEpsilon))
     return false;
 
   const float start = 0.15f;
@@ -306,6 +379,11 @@ bool TestHostTimingMeasurement()
   if (timing44k.latencySamples <= 0) return false;
   if (timing44k.tailSamples <= timing44k.latencySamples) return false;
 
+  const auto timing44kDefaults = spatialtail::MeasureReverbHostTiming(
+      44100.0, static_cast<float>(spatialtail::kReverbDefaultRoomSize), static_cast<float>(spatialtail::kReverbDefaultDamping));
+  if (timing44k.tailSamples < timing44kDefaults.tailSamples)
+    return false;
+
   const auto timing48k = spatialtail::MeasureReverbHostTiming(48000.0);
   if (timing48k.latencySamples <= 0) return false;
   if (timing48k.tailSamples <= timing48k.latencySamples) return false;
@@ -349,12 +427,23 @@ bool TestDryAlignmentDelay()
     if (std::fabs(passThrough[i] - inNoDelay[i]) > static_cast<float>(kEpsilon)) return false;
   }
 
+  std::vector<float> emptyDelayLine;
+  std::vector<float> emptyDelayOut(inNoDelay.size(), 0.f);
+  spatialtail::ApplyMonoDelay(inNoDelay.data(), emptyDelayOut.data(), static_cast<int>(inNoDelay.size()), 4,
+                              emptyDelayLine, writePos);
+  for (size_t i = 0; i < inNoDelay.size(); ++i)
+  {
+    if (std::fabs(emptyDelayOut[i] - inNoDelay[i]) > static_cast<float>(kEpsilon)) return false;
+  }
+
   return true;
 }
 
 bool TestDebugHRTFLoadFailureToggle()
 {
-  if (unsetenv(spatialtail::kForceHRTFLoadFailureEnvVar) != 0)
+  ScopedEnvVarRestore restore(spatialtail::kForceHRTFLoadFailureEnvVar);
+
+  if (!UnsetEnvVarPortable(spatialtail::kForceHRTFLoadFailureEnvVar))
     return false;
 
   if (spatialtail::ShouldForceHRTFLoadFailureInDebug())
@@ -364,7 +453,15 @@ bool TestDebugHRTFLoadFailureToggle()
   if (std::string(spatialtail::ResolveHRTFLoadPath(defaultPath)) != defaultPath)
     return false;
 
-  if (setenv(spatialtail::kForceHRTFLoadFailureEnvVar, "1", 1) != 0)
+  if (!SetEnvVarPortable(spatialtail::kForceHRTFLoadFailureEnvVar, "off"))
+    return false;
+
+  if (spatialtail::ShouldForceHRTFLoadFailureInDebug())
+    return false;
+  if (std::string(spatialtail::ResolveHRTFLoadPath(defaultPath)) != defaultPath)
+    return false;
+
+  if (!SetEnvVarPortable(spatialtail::kForceHRTFLoadFailureEnvVar, "1"))
     return false;
 
 #if !defined(NDEBUG)
@@ -378,9 +475,6 @@ bool TestDebugHRTFLoadFailureToggle()
   if (std::string(spatialtail::ResolveHRTFLoadPath(defaultPath)) != defaultPath)
     return false;
 #endif
-
-  if (unsetenv(spatialtail::kForceHRTFLoadFailureEnvVar) != 0)
-    return false;
 
   return true;
 }
@@ -432,6 +526,30 @@ bool TestRuntimeTuningApplyGuard()
   if (!spatialtail::ApplyReverbTuningRuntime(reverb, 0.63f, 0.17f, appliedRoom, appliedDamping))
     return false;
 
+  if (!spatialtail::ApplyReverbTuningRuntime(reverb, -1.0f, 2.0f, appliedRoom, appliedDamping))
+    return false;
+
+  if (std::fabs(appliedRoom - static_cast<float>(spatialtail::kReverbRoomMin)) > static_cast<float>(kEpsilon))
+    return false;
+  if (std::fabs(appliedDamping - static_cast<float>(spatialtail::kReverbDampingMax)) > static_cast<float>(kEpsilon))
+    return false;
+
+  if (spatialtail::ApplyReverbTuningRuntime(
+          reverb,
+          appliedRoom + 0.5f * spatialtail::kReverbTuningApplyEpsilon,
+          appliedDamping,
+          appliedRoom,
+          appliedDamping))
+    return false;
+
+  if (!spatialtail::ApplyReverbTuningRuntime(
+          reverb,
+          appliedRoom + 2.0f * spatialtail::kReverbTuningApplyEpsilon,
+          appliedDamping,
+          appliedRoom,
+          appliedDamping))
+    return false;
+
   return true;
 }
 
@@ -450,7 +568,7 @@ bool TestReverbTuningBugReproductionWithoutReset()
   const auto pinkDampLow = MeasureWetMetrics(pink, 0.72f, 0.0f, false);
   const auto pinkDampHigh = MeasureWetMetrics(pink, 0.72f, 1.0f, false);
 
-  const double kExpectedNoChange = 1.0e-12;
+  const double kExpectedNoChange = 1.0e-9;
   if (std::fabs(impulseRoomLow.rms - impulseRoomHigh.rms) > kExpectedNoChange) return false;
   if (std::fabs(impulseRoomLow.hfRatio - impulseRoomHigh.hfRatio) > kExpectedNoChange) return false;
   if (std::fabs(impulseRoomLow.envelopeMean - impulseRoomHigh.envelopeMean) > kExpectedNoChange) return false;

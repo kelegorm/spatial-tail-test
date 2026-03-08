@@ -2,8 +2,10 @@
 
 #include "../libs/iPlug2/WDL/verbengine.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 namespace spatialtail
@@ -112,11 +114,22 @@ inline float SmoothTowards(float current, float target, float coefficient)
 
 inline bool IsTruthyEnvValue(const char* value)
 {
-  if (!value || !value[0])
+  if (!value)
     return false;
 
-  return value[0] == '1' || value[0] == 'y' || value[0] == 'Y' || value[0] == 't' || value[0] == 'T'
-      || value[0] == 'o' || value[0] == 'O';
+  std::string token(value);
+  const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
+  token.erase(token.begin(), std::find_if(token.begin(), token.end(),
+                                          [&](unsigned char ch) { return !isSpace(ch); }));
+  token.erase(std::find_if(token.rbegin(), token.rend(),
+                           [&](unsigned char ch) { return !isSpace(ch); }).base(),
+              token.end());
+  if (token.empty())
+    return false;
+
+  std::transform(token.begin(), token.end(), token.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return token == "1" || token == "true" || token == "yes" || token == "on";
 }
 
 inline bool ShouldForceHRTFLoadFailureInDebug()
@@ -243,7 +256,9 @@ inline void ApplyMonoDelay(const float* input, float* output, int nFrames, int d
   }
 }
 
-inline ReverbHostTiming MeasureReverbHostTiming(double sampleRate)
+inline ReverbHostTiming MeasureReverbHostTiming(double sampleRate,
+                                                float roomSize = static_cast<float>(kReverbRoomMax),
+                                                float damping = static_cast<float>(kReverbDampingMin))
 {
   ReverbHostTiming timing;
   if (sampleRate <= 0.0)
@@ -251,6 +266,9 @@ inline ReverbHostTiming MeasureReverbHostTiming(double sampleRate)
 
   WDL_ReverbEngine probeReverb;
   ResetReverb(probeReverb, sampleRate);
+  probeReverb.SetRoomSize(ClampReverbRoomSize(roomSize));
+  probeReverb.SetDampening(ClampReverbDamping(damping));
+  probeReverb.Reset(false);
 
   constexpr int kBlockSize = 256;
   const int maxProbeSamples = std::max(kBlockSize, static_cast<int>(sampleRate * kReverbTailMaxProbeSeconds));

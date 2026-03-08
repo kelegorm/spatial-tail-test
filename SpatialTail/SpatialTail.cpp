@@ -9,13 +9,6 @@
 #define DEFAULT_SOFA_PATH "/Users/dmitry/Work/my_own/spatial-tail-test/libs/libmysofa/share/MIT_KEMAR_normal_pinna.sofa"
 #endif
 
-#if !defined(NDEBUG)
-namespace
-{
-constexpr float kReverbAutomationGuardThreshold = 1.0e-4f;
-}
-#endif
-
 SpatialTail::SpatialTail(const InstanceInfo& info)
 : iplug::Plugin(info, MakeConfig(kNumParams, kNumPresets))
 {
@@ -104,10 +97,6 @@ void SpatialTail::OnReset()
   mAppliedReverbDamping = std::numeric_limits<float>::quiet_NaN();
   spatialtail::ApplyReverbTuningRuntime(mReverb, mSmoothedReverbRoomSize, mSmoothedReverbDamping,
                                         mAppliedReverbRoomSize, mAppliedReverbDamping);
-#if !defined(NDEBUG)
-  mDebugLastReverbRoomTarget = mSmoothedReverbRoomSize;
-  mDebugLastReverbDampingTarget = mSmoothedReverbDamping;
-#endif
 
   if (sr != mLastSampleRate)
   {
@@ -172,22 +161,20 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       GetSampleRate(), nFrames, spatialtail::kAutomationSmoothingTimeSeconds);
   mSmoothedReverbRoomSize = spatialtail::SmoothTowards(mSmoothedReverbRoomSize, reverbRoomTarget, reverbSmoothCoeff);
   mSmoothedReverbDamping = spatialtail::SmoothTowards(mSmoothedReverbDamping, reverbDampingTarget, reverbSmoothCoeff);
+  const bool expectedReverbTuningApply = spatialtail::ShouldUpdateReverbTuning(
+      mAppliedReverbRoomSize, mAppliedReverbDamping,
+      spatialtail::ClampReverbRoomSize(mSmoothedReverbRoomSize),
+      spatialtail::ClampReverbDamping(mSmoothedReverbDamping));
   const bool didApplyReverbTuning = spatialtail::ApplyReverbTuningRuntime(
       mReverb, mSmoothedReverbRoomSize, mSmoothedReverbDamping, mAppliedReverbRoomSize, mAppliedReverbDamping);
 #if !defined(NDEBUG)
-  const bool roomTargetMoved = std::isnan(mDebugLastReverbRoomTarget)
-      || std::fabs(reverbRoomTarget - mDebugLastReverbRoomTarget) > kReverbAutomationGuardThreshold;
-  const bool dampingTargetMoved = std::isnan(mDebugLastReverbDampingTarget)
-      || std::fabs(reverbDampingTarget - mDebugLastReverbDampingTarget) > kReverbAutomationGuardThreshold;
-  if ((roomTargetMoved || dampingTargetMoved) && !didApplyReverbTuning)
+  if (expectedReverbTuningApply && !didApplyReverbTuning)
   {
-    DBGMSG("SpatialTail DEBUG: reverb automation changed but tuning was not applied "
+    DBGMSG("SpatialTail DEBUG: reverb tuning update expected but was not applied "
            "(room target=%.6f, damping target=%.6f, smoothed room=%.6f, smoothed damping=%.6f)\n",
            reverbRoomTarget, reverbDampingTarget, mSmoothedReverbRoomSize, mSmoothedReverbDamping);
-    assert(didApplyReverbTuning && "Reverb automation moved without applying runtime tuning.");
+    assert(didApplyReverbTuning && "Reverb tuning update was expected but not applied.");
   }
-  mDebugLastReverbRoomTarget = reverbRoomTarget;
-  mDebugLastReverbDampingTarget = reverbDampingTarget;
 #endif
 
   spatialtail::CopyMonoToStereoReverbInputs(mMonoIn.data(), mReverbInL.data(), mReverbInR.data(), nFrames);
