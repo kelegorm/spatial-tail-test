@@ -12,7 +12,20 @@ This is a proof-of-concept before building the full "cloudverb" effect.
 - Target DAW: Bitwig Studio on macOS
 
 ## Build
-(fill in after iPlug2 setup)
+
+Build VST3 (Debug):
+```bash
+xcodebuild -workspace SpatialTail/SpatialTail.xcworkspace \
+  -scheme "macOS-VST3" \
+  -configuration Debug \
+  build
+```
+
+Install to `~/Library/Audio/Plug-Ins/VST3/` happens automatically as part of the build.
+If it fails with a permissions error on that directory, fix once with:
+```bash
+sudo chown -R $(whoami) ~/Library/Audio/Plug-Ins/VST3
+```
 
 ## Test
 (fill in after iPlug2 setup)
