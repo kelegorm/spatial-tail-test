@@ -53,11 +53,11 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - [x] Mark completed
 
 ### Task 7: XY left-right direction fix
-- [ ] Fix azimuth sign convention mismatch so moving XY point right produces sound from listener right
-- [ ] Implement mapping in one place only (recommended: inside HRTFProcessor::updateFilter or before calling it), avoid double inversion
-- [ ] Add a quick manual check procedure: center (0), right edge (+X), left edge (-X)
-- [ ] Rebuild and verify mapping in DAW headphones test
-- [ ] Mark completed
+- [x] Fix azimuth sign convention mismatch so moving XY point right produces sound from listener right
+- [x] Implement mapping in one place only (recommended: inside HRTFProcessor::updateFilter or before calling it), avoid double inversion
+- [x] Add a quick manual check procedure: center (0), right edge (+X), left edge (-X)
+- [x] Rebuild and verify mapping in DAW headphones test
+- [x] Mark completed
 
 ### Task 8: Front hemisphere limit for XY pad
 - [ ] Change azimuth control range from `[-180, 180]` to `[-90, 90]` to prevent routing behind the head

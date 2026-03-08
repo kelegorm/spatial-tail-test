@@ -46,8 +46,11 @@ void HRTFProcessor::updateFilter(float azimuthDeg, float elevationDeg, float dis
   if (!mEasy)
     return;
 
-  // mysofa_s2c converts [azimuth_deg, elevation_deg, radius] to Cartesian [x,y,z]
-  float coords[3] = { azimuthDeg, elevationDeg, distanceM };
+  // mysofa_s2c converts [azimuth_deg, elevation_deg, radius] to Cartesian [x,y,z].
+  // SOFA/AES convention: positive azimuth is to the LEFT (counterclockwise from above).
+  // GUI convention: positive X (azimuth param) is to the RIGHT.
+  // Negate azimuth here so that moving the XY pad right puts the source on the right.
+  float coords[3] = { -azimuthDeg, elevationDeg, distanceM };
   mysofa_s2c(coords);
 
   // delayL/delayR (ITD fractional delays) intentionally ignored for MVP
