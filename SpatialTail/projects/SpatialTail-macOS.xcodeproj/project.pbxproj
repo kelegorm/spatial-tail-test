@@ -48,6 +48,8 @@
 		4F35DEB1207E5C5A00867D8F /* IPlugPluginBase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F35DEAB207E5C5A00867D8F /* IPlugPluginBase.cpp */; };
 		4F3862EF2014BBEC0009F402 /* SpatialTail.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */; };
 		4F3862F12014BBEC0009F402 /* SpatialTail.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */; };
+		AA00DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
+		AA00FEED2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */; };
 		4F3862F22014BBEC0009F402 /* SpatialTail.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */; };
 		4F3862F32014BBEC0009F402 /* SpatialTail.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */; };
 		4F3EE1BF231438D000004786 /* SpatialTail.icns in Resources */ = {isa = PBXBuildFile; fileRef = 4FD290A8137C34D700CEBE7E /* SpatialTail.icns */; };
@@ -391,6 +393,8 @@
 		4F35DEAC207E5C5A00867D8F /* IPlugPluginBase.h */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.h; name = IPlugPluginBase.h; path = ../../libs/iPlug2/IPlug/IPlugPluginBase.h; sourceTree = "<group>"; tabWidth = 2; };
 		4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SpatialTail.cpp; path = ../SpatialTail.cpp; sourceTree = "<group>"; };
 		4F3862EE2014BBEC0009F402 /* SpatialTail.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SpatialTail.h; path = ../SpatialTail.h; sourceTree = "<group>"; };
+		AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = HRTFProcessor.cpp; path = ../HRTFProcessor.cpp; sourceTree = "<group>"; };
+		AA00BEEF2014BBEC0009F402 /* HRTFProcessor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HRTFProcessor.h; path = ../HRTFProcessor.h; sourceTree = "<group>"; };
 		4F3862FF2014BCC70009F402 /* scripts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = scripts; path = ../scripts; sourceTree = "<group>"; };
 		4F3907602013EBA300DDA490 /* SpatialTail.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SpatialTail.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F3907772013EC0400DDA490 /* IPlugAUViewController.mm */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; fileEncoding = 4; name = IPlugAUViewController.mm; path = ../../libs/iPlug2/IPlug/AUv3/IPlugAUViewController.mm; sourceTree = "<group>"; };
@@ -839,6 +843,8 @@
 				52FBBED30D0CF143001C8B8A /* config.h */,
 				4F3862EE2014BBEC0009F402 /* SpatialTail.h */,
 				4F3862ED2014BBEC0009F402 /* SpatialTail.cpp */,
+				AA00BEEF2014BBEC0009F402 /* HRTFProcessor.h */,
+				AA00CAFE2014BBEC0009F402 /* HRTFProcessor.cpp */,
 				4F9313232315CA1100DB2383 /* README.md */,
 				089C167CFE841241C02AAC07 /* Resources */,
 				32C88E010371C26100C91783 /* Other Sources */,
@@ -2411,6 +2417,7 @@
 				4FDAC0EC207D76C600299363 /* IPlugTimer.cpp in Sources */,
 				B8E22A0C220268C4007CBF4C /* IPlugVST3_ProcessorBase.cpp in Sources */,
 				4F3862F12014BBEC0009F402 /* SpatialTail.cpp in Sources */,
+				AA00DEAD2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 				4F81591F205D50EB00393585 /* pluginfactory.cpp in Sources */,
 				4F63696F20A463090022C370 /* IControls.cpp in Sources */,
 				4F6FD2B322675B6300FC59E6 /* IGraphicsCoreText.mm in Sources */,
@@ -2544,6 +2551,7 @@
 				4FD8699C27206006005A5F28 /* IGraphicsEditorDelegate.cpp in Sources */,
 				4FD8699D27206006005A5F28 /* IGraphicsNanoVG_src.m in Sources */,
 				4FD8699E27206006005A5F28 /* SpatialTail.cpp in Sources */,
+				AA00FEED2014BBEC0009F402 /* HRTFProcessor.cpp in Sources */,
 				4FD8699F27206006005A5F28 /* IPlugAPIBase.cpp in Sources */,
 				4FD869A027206006005A5F28 /* IGraphicsMac_view.mm in Sources */,
 				4FD869A127206006005A5F28 /* IPlugProcessor.cpp in Sources */,

@@ -24,12 +24,12 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - [x] Mark completed
 
 ### Task 3: HRTFProcessor class
-- [ ] Create SpatialTail/HRTFProcessor.h with class definition
-- [ ] Create SpatialTail/HRTFProcessor.cpp
-- [ ] Implement constructor: load default.sofa bundled with libmysofa via mysofa_load()
-- [ ] Implement process(float* in, float* outL, float* outR, int nFrames, float azimuth, float elevation, float distance): find nearest HRIR via mysofa_getfilter_float(), apply time-domain FIR convolution
-- [ ] Add HRTFProcessor.cpp to SpatialTail-macOS.xcodeproj sources
-- [ ] Mark completed
+- [x] Create SpatialTail/HRTFProcessor.h with class definition
+- [x] Create SpatialTail/HRTFProcessor.cpp
+- [x] Implement constructor: load default.sofa bundled with libmysofa via mysofa_load()
+- [x] Implement process(float* in, float* outL, float* outR, int nFrames, float azimuth, float elevation, float distance): find nearest HRIR via mysofa_getfilter_float(), apply time-domain FIR convolution
+- [x] Add HRTFProcessor.cpp to SpatialTail-macOS.xcodeproj sources
+- [x] Mark completed
 
 ### Task 4: Wire DSP
 - [ ] In SpatialTail/SpatialTail.h add HRTFProcessor member and parameters for azimuth, elevation, distance, dryWet
