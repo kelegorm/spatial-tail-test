@@ -4,6 +4,28 @@
 
 struct MYSOFA_EASY;
 
+// ---------------------------------------------------------------------------
+// Debug instrumentation — present only in Debug builds (NDEBUG not defined).
+// ---------------------------------------------------------------------------
+#ifndef NDEBUG
+
+// Feature-bypass and logging flags for isolated testing and diagnosis.
+// Set individual fields before processing to enable instrumentation.
+// logLookup and logTransition print to stderr — enable only during investigation.
+struct HRTFDebugFlags
+{
+  // Logging
+  bool logLookup     = false;  // log az/el/dist + ITD per process() block
+  bool logTransition = false;  // log when a pending target is committed
+
+  // Feature bypass (no-ops until the corresponding task implements the feature)
+  bool disableITD       = false;  // bypass ITD delay application  (Task 4)
+  bool disableCrossfade = false;  // bypass crossfade transitions   (Task 5)
+  bool disableSmoothing = false;  // bypass az/el smoothing          (Task 6)
+};
+
+#endif // !NDEBUG
+
 // Holds one complete HRTF filter state (both ears, plus ITD delays).
 // Preallocated at load time; never resized on the audio thread.
 struct HRTFState
@@ -65,4 +87,11 @@ private:
   // mCrossfadeRemaining counts down to 0 as the crossfade progresses.
   int mCrossfadeLengthSamples = 0;
   int mCrossfadeRemaining = 0;
+
+#ifndef NDEBUG
+public:
+  // Accessible from tests and host code; not present in Release builds.
+  HRTFDebugFlags mDebug;
+
+#endif
 };

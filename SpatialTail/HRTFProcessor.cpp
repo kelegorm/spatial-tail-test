@@ -1,7 +1,13 @@
 #include "HRTFProcessor.h"
 
 #include <algorithm>
+#include <cassert>
+#include <cmath>
 #include <cstring>
+
+#ifndef NDEBUG
+#  include <cstdio>
+#endif
 
 #include "hrtf/mysofa.h"
 
@@ -56,6 +62,18 @@ bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
   return true;
 }
 
+#ifndef NDEBUG
+// Returns sum of |irL[k] - irR[k]| for the given state.
+// Used to detect center collapse (both ears receiving an identical response).
+static float computeIRDifference(const HRTFState& state, int filterLength)
+{
+  float sum = 0.f;
+  for (int k = 0; k < filterLength; ++k)
+    sum += std::abs(state.irL[k] - state.irR[k]);
+  return sum;
+}
+#endif
+
 void HRTFProcessor::lookupTarget(float azimuthDeg, float elevationDeg, float distanceM)
 {
   if (!mEasy)
@@ -80,6 +98,32 @@ void HRTFProcessor::lookupTarget(float azimuthDeg, float elevationDeg, float dis
                          mTargetState.irL.data(), mTargetState.irR.data(),
                          &mTargetState.delayL, &mTargetState.delayR);
 
+#ifndef NDEBUG
+  // Validate ITD delay values: must be finite and physically plausible.
+  // Maximum ITD at ~0.09 m head radius ≈ 0.00066 s; add margin for SOFA data variation.
+  assert(!std::isnan(mTargetState.delayL) && "delayL is NaN after SOFA lookup");
+  assert(!std::isnan(mTargetState.delayR) && "delayR is NaN after SOFA lookup");
+  assert(mTargetState.delayL >= 0.f    && "delayL is negative");
+  assert(mTargetState.delayR >= 0.f    && "delayR is negative");
+  // Warn (not assert) for unusually large values — some SOFA files may differ.
+  if (mTargetState.delayL > 0.01f || mTargetState.delayR > 0.01f)
+  {
+    fprintf(stderr, "[HRTF] WARNING: unusually large ITD delay: delayL=%.6f delayR=%.6f\n",
+            mTargetState.delayL, mTargetState.delayR);
+  }
+
+  if (mDebug.logLookup)
+  {
+    const float irDiff = computeIRDifference(mTargetState, mFilterLength);
+    fprintf(stderr,
+            "[HRTF] lookup az=%.2f el=%.2f dist=%.3f  delayL=%.6f delayR=%.6f  irDiff=%.6f%s\n",
+            az, el, dist,
+            mTargetState.delayL, mTargetState.delayR,
+            irDiff,
+            irDiff < 1e-6f ? "  *** CENTER COLLAPSE DETECTED ***" : "");
+  }
+#endif
+
   mTargetPending = true;
 }
 
@@ -94,6 +138,13 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
     return;
   }
 
+#ifndef NDEBUG
+  // Acknowledge bypass flags consumed by future tasks so the compiler does not
+  // warn about unused fields in builds where those tasks are not yet active.
+  (void)mDebug.disableITD;
+  (void)mDebug.disableSmoothing;
+#endif
+
   // Look up the new target for this block and store it in mTargetState.
   lookupTarget(azimuthDeg, elevationDeg, distanceM);
 
@@ -101,6 +152,17 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
   // mCrossfadeRemaining is managed here once crossfade logic is added in Task 5.
   if (mTargetPending)
   {
+#ifndef NDEBUG
+    if (mDebug.logTransition)
+    {
+      fprintf(stderr,
+              "[HRTF] transition: committing new target  delayL=%.6f delayR=%.6f  crossfadeRemaining=%d\n",
+              mTargetState.delayL, mTargetState.delayR, mCrossfadeRemaining);
+    }
+    // disableCrossfade flag: respected here so Task 5 can be bypassed for testing.
+    // (No-op until Task 5 implements crossfade logic; included now for future use.)
+    (void)mDebug.disableCrossfade;
+#endif
     mCurrentState = mTargetState;  // copy preallocated vectors — no heap alloc
     mTargetPending = false;
     mCrossfadeRemaining = 0;       // no crossfade yet; Task 5 will set this

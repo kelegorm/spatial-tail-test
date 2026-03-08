@@ -29,11 +29,11 @@ Goal:
 - [x] Mark completed
 
 ### Task 2: Debug instrumentation for HRTF motion diagnostics
-- [ ] Add debug-only logging or assertions for azimuth, elevation, distance, selected ITD delays, and transition activity
-- [ ] Add enough instrumentation to diagnose center collapse, invalid delay values, and transition edge cases
-- [ ] Add debug flags to independently disable ITD, crossfade, and smoothing for isolated testing
-- [ ] Keep release builds clean and unchanged
-- [ ] Mark completed
+- [x] Add debug-only logging or assertions for azimuth, elevation, distance, selected ITD delays, and transition activity
+- [x] Add enough instrumentation to diagnose center collapse, invalid delay values, and transition edge cases
+- [x] Add debug flags to independently disable ITD, crossfade, and smoothing for isolated testing
+- [x] Keep release builds clean and unchanged
+- [x] Mark completed
 
 ### Task 3: Automated tests for HRTF processing correctness
 - [ ] ITD delay test: feed an impulse at a known azimuth, measure arrival time difference between L/R channels, compare against expected `delayL`/`delayR` from SOFA within tolerance
