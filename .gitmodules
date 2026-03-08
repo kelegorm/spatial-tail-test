@@ -1,3 +1,6 @@
 [submodule "libs/iPlug2"]
 	path = libs/iPlug2
 	url = https://github.com/iPlug2/iPlug2
+[submodule "libs/libmysofa"]
+	path = libs/libmysofa
+	url = https://github.com/hoene/libmysofa

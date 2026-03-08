@@ -15,13 +15,13 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - [x] Mark completed
 
 ### Task 2: libmysofa dependency
-- [ ] Add libmysofa as git submodule in libs/libmysofa using https://github.com/hoene/libmysofa
-- [ ] Build libmysofa as static library using CMake into libs/libmysofa/build/
-- [ ] Add libs/libmysofa/src to Header Search Paths in SpatialTail-macOS.xcodeproj
-- [ ] Add libs/libmysofa/build/src/libmysofa.a to Link Binary With Libraries in SpatialTail-macOS.xcodeproj
-- [ ] Add zlib (system) to Link Binary With Libraries
-- [ ] Verify build succeeds with libmysofa linked
-- [ ] Mark completed
+- [x] Add libmysofa as git submodule in libs/libmysofa using https://github.com/hoene/libmysofa
+- [x] Build libmysofa as static library using CMake into libs/libmysofa/build/
+- [x] Add libs/libmysofa/src to Header Search Paths in SpatialTail-macOS.xcodeproj
+- [x] Add libs/libmysofa/build/src/libmysofa.a to Link Binary With Libraries in SpatialTail-macOS.xcodeproj
+- [x] Add zlib (system) to Link Binary With Libraries
+- [x] Verify build succeeds with libmysofa linked
+- [x] Mark completed
 
 ### Task 3: HRTFProcessor class
 - [ ] Create SpatialTail/HRTFProcessor.h with class definition

@@ -15,9 +15,11 @@ BINARY_NAME = SpatialTail
 
 // ------------------------------
 // HEADER AND LIBRARY SEARCH PATHS
-EXTRA_INC_PATHS = $(IGRAPHICS_INC_PATHS)
-EXTRA_LIB_PATHS = $(IGRAPHICS_LIB_PATHS)
-EXTRA_LNK_FLAGS = -framework Metal -framework MetalKit -framework OpenGL //$(IGRAPHICS_LNK_FLAGS)
+LIBMYSOFA_SRC = ../../libs/libmysofa/src
+LIBMYSOFA_BUILD = ../../libs/libmysofa/build/src
+EXTRA_INC_PATHS = $(IGRAPHICS_INC_PATHS) $(LIBMYSOFA_SRC) $(LIBMYSOFA_BUILD)
+EXTRA_LIB_PATHS = $(IGRAPHICS_LIB_PATHS) $(LIBMYSOFA_BUILD)
+EXTRA_LNK_FLAGS = -framework Metal -framework MetalKit -framework OpenGL -lmysofa -lz
 
 // EXTRA_APP_DEFS =
 // EXTRA_PLUGIN_DEFS =
