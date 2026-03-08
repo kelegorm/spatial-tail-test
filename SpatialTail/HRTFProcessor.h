@@ -10,6 +10,11 @@ public:
   HRTFProcessor();
   ~HRTFProcessor();
 
+  HRTFProcessor(const HRTFProcessor&) = delete;
+  HRTFProcessor& operator=(const HRTFProcessor&) = delete;
+  HRTFProcessor(HRTFProcessor&&) = delete;
+  HRTFProcessor& operator=(HRTFProcessor&&) = delete;
+
   bool load(const char* sofaPath, float sampleRate);
   void process(const float* in, float* outL, float* outR, int nFrames,
                float azimuthDeg, float elevationDeg, float distanceM);

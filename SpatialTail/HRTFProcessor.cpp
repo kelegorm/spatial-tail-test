@@ -25,8 +25,10 @@ bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
 
   int err = 0;
   mEasy = mysofa_open(sofaPath, sampleRate, &mFilterLength, &err);
-  if (!mEasy || err != 0)
+  if (!mEasy || err != 0 || mFilterLength <= 0)
   {
+    if (mEasy)
+      mysofa_close(mEasy);
     mEasy = nullptr;
     return false;
   }
