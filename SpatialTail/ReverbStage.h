@@ -3,6 +3,7 @@
 #include "../libs/iPlug2/WDL/verbengine.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <vector>
 
 namespace spatialtail
@@ -20,6 +21,8 @@ constexpr double kReverbLatencyDetectThreshold = 1.0e-12;
 constexpr double kReverbTailDetectThreshold = 1.0e-6;
 constexpr double kReverbTailMaxProbeSeconds = 20.0;
 constexpr double kReverbTailSilenceWindowSeconds = 0.25;
+constexpr const char* kForceHRTFLoadFailureEnvVar = "SPATIALTAIL_DEBUG_FORCE_HRTF_LOAD_FAILURE";
+constexpr const char* kForcedInvalidSofaPath = "/__spatialtail__/forced-invalid.sofa";
 
 struct ReverbHostTiming
 {
@@ -76,6 +79,32 @@ inline float SmoothTowards(float current, float target, float coefficient)
   return current + coeff * (target - current);
 }
 
+inline bool IsTruthyEnvValue(const char* value)
+{
+  if (!value || !value[0])
+    return false;
+
+  return value[0] == '1' || value[0] == 'y' || value[0] == 'Y' || value[0] == 't' || value[0] == 'T'
+      || value[0] == 'o' || value[0] == 'O';
+}
+
+inline bool ShouldForceHRTFLoadFailureInDebug()
+{
+#if !defined(NDEBUG)
+  return IsTruthyEnvValue(std::getenv(kForceHRTFLoadFailureEnvVar));
+#else
+  return false;
+#endif
+}
+
+inline const char* ResolveHRTFLoadPath(const char* defaultPath)
+{
+  if (ShouldForceHRTFLoadFailureInDebug())
+    return kForcedInvalidSofaPath;
+
+  return defaultPath;
+}
+
 inline void CopyMonoToStereoReverbInputs(const float* monoFoldDown, double* reverbInL, double* reverbInR, int nFrames)
 {
   for (int s = 0; s < nFrames; ++s)
@@ -119,6 +148,30 @@ inline void CollapseStereoReverbToMono(const double* reverbOutL, const double* r
 {
   for (int s = 0; s < nFrames; ++s)
     wetMono[s] = static_cast<float>(0.5 * (reverbOutL[s] + reverbOutR[s]));
+}
+
+inline float ComputeWetDistanceGain(float distance, bool hrtfLoaded)
+{
+  if (!hrtfLoaded)
+    return 1.f;
+
+  const float safeDistance = distance < 0.1f ? 0.1f : distance;
+  return 1.f / safeDistance;
+}
+
+inline float ClampAudioSample(float sample)
+{
+  return std::max(-1.f, std::min(1.f, sample));
+}
+
+inline void FillStereoFromFallbackWetMono(const float* wetMono, float* outL, float* outR, int nFrames)
+{
+  for (int s = 0; s < nFrames; ++s)
+  {
+    const float clamped = ClampAudioSample(wetMono[s]);
+    outL[s] = clamped;
+    outR[s] = clamped;
+  }
 }
 
 inline void PrepareMonoDelayLine(std::vector<float>& delayLine, int delaySamples, int& writePos)

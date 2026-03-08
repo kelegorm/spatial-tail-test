@@ -103,8 +103,9 @@ void SpatialTail::OnReset()
     SetLatency(mReverbLatencySamples);
     SetTailSize(mReverbTailSamples);
 
-    if (!mHRTF.load(DEFAULT_SOFA_PATH, static_cast<float>(sr)))
-      DBGMSG("HRTFProcessor: failed to load SOFA file: %s\n", DEFAULT_SOFA_PATH);
+    const char* sofaPath = spatialtail::ResolveHRTFLoadPath(DEFAULT_SOFA_PATH);
+    if (!mHRTF.load(sofaPath, static_cast<float>(sr)))
+      DBGMSG("HRTFProcessor: failed to load SOFA file: %s\n", sofaPath);
 
     // One-pole smoother: time constant ~20 ms to avoid zipper noise on distance knob
     mDistanceSmoothCoeff = 1.f - std::exp(-1.f / (0.020f * static_cast<float>(sr)));
@@ -171,18 +172,14 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   }
   else
   {
-    // Fallback keeps wet path from the reverb stage but bypasses distance boost.
-    for (int s = 0; s < nFrames; ++s)
-    {
-      mHrtfL[s] = mReverbWetMono[s];
-      mHrtfR[s] = mReverbWetMono[s];
-    }
+    // Fallback keeps wet path from the reverb stage, bypasses distance boost,
+    // and hard-limits to avoid accidental clipping when HRTF is unavailable.
+    spatialtail::FillStereoFromFallbackWetMono(mReverbWetMono.data(), mHrtfL.data(), mHrtfR.data(), nFrames);
   }
 
   // Inverse-distance gain: 1 m is the reference (gain = 1.0).
-  // Clamped so gain never exceeds 20 dB boost (distance < 0.1 m clips to 0.1).
-  const float safeDistance = distance < 0.1f ? 0.1f : distance;
-  const float targetGain   = hrtfLoaded ? (1.f / safeDistance) : 1.f; // 0.1 m → 10x, 10 m → 0.1x
+  // When HRTF is unavailable, fallback gain is forced to unity.
+  const float targetGain = spatialtail::ComputeWetDistanceGain(distance, hrtfLoaded);
 
   // Mix dry mono + wet binaural (with smoothed distance gain) into stereo outputs
   for (int s = 0; s < nFrames; ++s)

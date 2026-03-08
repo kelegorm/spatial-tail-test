@@ -39,6 +39,6 @@ Goal: spatialize the reverb output (tail/object), not the raw dry input.
 Listening notes (manual, outside ralphex task checkboxes):
 - Confirm by listening test: with `kDryWet=1.0`, moving XY pad changes location of reverberant sound only
 - Confirm by listening test: with `kDryWet=0.0`, output is centered dry signal and unaffected by XY pad movement
-- [ ] Force HRTF load failure in Debug (e.g., invalid SOFA path) and confirm fallback avoids unintended gain boost or clipping
-- [ ] Rebuild and run validation commands
-- [ ] Mark completed
+- [x] Force HRTF load failure in Debug (e.g., invalid SOFA path) and confirm fallback avoids unintended gain boost or clipping
+- [x] Rebuild and run validation commands
+- [x] Mark completed

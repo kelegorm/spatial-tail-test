@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
+#include <string>
 #include <vector>
 
 namespace
@@ -230,6 +232,65 @@ bool TestDryAlignmentDelay()
 
   return true;
 }
+
+bool TestDebugHRTFLoadFailureToggle()
+{
+  if (unsetenv(spatialtail::kForceHRTFLoadFailureEnvVar) != 0)
+    return false;
+
+  if (spatialtail::ShouldForceHRTFLoadFailureInDebug())
+    return false;
+
+  const char* defaultPath = "/tmp/default.sofa";
+  if (std::string(spatialtail::ResolveHRTFLoadPath(defaultPath)) != defaultPath)
+    return false;
+
+  if (setenv(spatialtail::kForceHRTFLoadFailureEnvVar, "1", 1) != 0)
+    return false;
+
+#if !defined(NDEBUG)
+  if (!spatialtail::ShouldForceHRTFLoadFailureInDebug())
+    return false;
+  if (std::string(spatialtail::ResolveHRTFLoadPath(defaultPath)) != spatialtail::kForcedInvalidSofaPath)
+    return false;
+#else
+  if (spatialtail::ShouldForceHRTFLoadFailureInDebug())
+    return false;
+  if (std::string(spatialtail::ResolveHRTFLoadPath(defaultPath)) != defaultPath)
+    return false;
+#endif
+
+  if (unsetenv(spatialtail::kForceHRTFLoadFailureEnvVar) != 0)
+    return false;
+
+  return true;
+}
+
+bool TestFallbackGainAndClippingGuard()
+{
+  if (std::fabs(spatialtail::ComputeWetDistanceGain(0.1f, false) - 1.f) > static_cast<float>(kEpsilon))
+    return false;
+  if (std::fabs(spatialtail::ComputeWetDistanceGain(10.f, false) - 1.f) > static_cast<float>(kEpsilon))
+    return false;
+  if (std::fabs(spatialtail::ComputeWetDistanceGain(0.1f, true) - 10.f) > static_cast<float>(kEpsilon))
+    return false;
+
+  const std::vector<float> wetMono = {1.5f, -1.25f, 0.6f, -0.3f};
+  std::vector<float> outL(wetMono.size(), 0.f);
+  std::vector<float> outR(wetMono.size(), 0.f);
+  spatialtail::FillStereoFromFallbackWetMono(wetMono.data(), outL.data(), outR.data(), static_cast<int>(wetMono.size()));
+
+  const std::vector<float> expected = {1.f, -1.f, 0.6f, -0.3f};
+  for (size_t i = 0; i < expected.size(); ++i)
+  {
+    if (std::fabs(outL[i] - expected[i]) > static_cast<float>(kEpsilon))
+      return false;
+    if (std::fabs(outR[i] - expected[i]) > static_cast<float>(kEpsilon))
+      return false;
+  }
+
+  return true;
+}
 } // namespace
 
 int main()
@@ -285,6 +346,18 @@ int main()
   if (!TestDryAlignmentDelay())
   {
     std::cerr << "TestDryAlignmentDelay failed\n";
+    return 1;
+  }
+
+  if (!TestDebugHRTFLoadFailureToggle())
+  {
+    std::cerr << "TestDebugHRTFLoadFailureToggle failed\n";
+    return 1;
+  }
+
+  if (!TestFallbackGainAndClippingGuard())
+  {
+    std::cerr << "TestFallbackGainAndClippingGuard failed\n";
     return 1;
   }
 
