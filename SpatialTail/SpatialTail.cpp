@@ -97,6 +97,18 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       mMonoIn[s] = static_cast<float>(inputs[0][s]);
   }
 
+  // If HRTF failed to load, pass mono through to both channels without applying
+  // distance gain (which could boost up to 10x and cause clipping on the fallback signal).
+  if (!mHRTF.isLoaded())
+  {
+    for (int s = 0; s < nFrames; ++s)
+    {
+      outputs[0][s] = static_cast<sample>(mMonoIn[s]);
+      outputs[1][s] = static_cast<sample>(mMonoIn[s]);
+    }
+    return;
+  }
+
   mHRTF.process(mMonoIn.data(), mHrtfL.data(), mHrtfR.data(), nFrames, azimuth, elevation, distance);
 
   // Inverse-distance gain: 1 m is the reference (gain = 1.0).
