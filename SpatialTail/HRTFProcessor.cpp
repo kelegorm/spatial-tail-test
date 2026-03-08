@@ -53,9 +53,18 @@ bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
   mInputBuffer.assign(mFilterLength, 0.f);
   mBufPos = 0;
 
-  // Crossfade length: fixed at load time, used by the transition logic in Task 5.
+  // Crossfade length: fixed at load time.
   mCrossfadeLengthSamples = kDefaultCrossfadeSamples;
   mCrossfadeRemaining = 0;
+
+  // Position sentinels: force the first HRTF lookup in process().
+  mLastAzimuthDeg  = 1e10f;
+  mLastElevationDeg = 1e10f;
+  mLastDistanceM   = 1e10f;
+
+  // Crossfade "from" delays: reset at load time.
+  mFromDelayL = 0.f;
+  mFromDelayR = 0.f;
 
   // ITD delay buffers: preallocated here, never resized on the audio thread.
   // kMaxITDDelaySamples is sized conservatively (see header for rationale).
@@ -147,46 +156,123 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
   }
 
 #ifndef NDEBUG
-  // Acknowledge bypass flags consumed by future tasks so the compiler does not
-  // warn about unused fields in builds where those tasks are not yet active.
   (void)mDebug.disableSmoothing;
 #endif
 
-  // Look up the new target for this block and store it in mTargetState.
-  lookupTarget(azimuthDeg, elevationDeg, distanceM);
+  // Only re-look up the HRTF when position changes beyond a small threshold.
+  // This prevents restarting an in-progress crossfade on every block when the
+  // host keeps sending the same parameter values, and avoids redundant SOFA work.
+  static constexpr float kPosTolerance = 0.1f;  // degrees / metres
+  const bool posChanged =
+      (std::fabs(azimuthDeg  - mLastAzimuthDeg)   > kPosTolerance ||
+       std::fabs(elevationDeg - mLastElevationDeg) > kPosTolerance ||
+       std::fabs(distanceM   - mLastDistanceM)     > kPosTolerance);
 
-  // Apply the pending target: abrupt switch for now (Task 5 will crossfade).
-  // mCrossfadeRemaining is managed here once crossfade logic is added in Task 5.
+  if (posChanged)
+  {
+    lookupTarget(azimuthDeg, elevationDeg, distanceM);
+    mLastAzimuthDeg   = azimuthDeg;
+    mLastElevationDeg = elevationDeg;
+    mLastDistanceM    = distanceM;
+  }
+
+  // Handle newly looked-up target: start or update the crossfade.
   if (mTargetPending)
   {
+    bool doCrossfade = true;
 #ifndef NDEBUG
+    doCrossfade = !mDebug.disableCrossfade;
     if (mDebug.logTransition)
     {
       fprintf(stderr,
-              "[HRTF] transition: committing new target  delayL=%.6f delayR=%.6f  crossfadeRemaining=%d\n",
+              "[HRTF] transition: %s  delayL=%.6f delayR=%.6f  crossfadeRemaining=%d\n",
+              (mCrossfadeRemaining == 0) ? "start crossfade" : "update target mid-crossfade",
               mTargetState.delayL, mTargetState.delayR, mCrossfadeRemaining);
     }
-    // disableCrossfade flag: respected here so Task 5 can be bypassed for testing.
-    // (No-op until Task 5 implements crossfade logic; included now for future use.)
-    (void)mDebug.disableCrossfade;
 #endif
-    mCurrentState = mTargetState;  // copy preallocated vectors — no heap alloc
+
+    if (!doCrossfade)
+    {
+      // Bypass: instant switch with no blending.
+      mCurrentState = mTargetState;  // no heap alloc; same-size vectors
+      mCrossfadeRemaining = 0;
+    }
+    else if (mCrossfadeRemaining == 0)
+    {
+      // No crossfade in progress: start one from the current committed state.
+      // Save "from" ITD delays for per-sample interpolation in the ITD stage.
+      mFromDelayL = mCurrentState.delayL;
+      mFromDelayR = mCurrentState.delayR;
+      mCrossfadeRemaining = mCrossfadeLengthSamples;
+    }
+    // else: crossfade is already running; mTargetState has been updated by
+    // lookupTarget(). The ongoing crossfade continues from mCurrentState toward
+    // the new target at its current alpha position — no reset, no discontinuity
+    // in the "from" side (mCurrentState is unchanged).
+
     mTargetPending = false;
-    mCrossfadeRemaining = 0;       // no crossfade yet; Task 5 will set this
   }
 
-  // Time-domain FIR convolution using mCurrentState IRs and the circular input buffer.
-  // Processing order: FIR (spectral HRTF shaping) is applied first; the per-ear ITD
-  // delay stage below then time-shifts each channel independently.
+  // Save crossfade state before the FIR phase modifies mCrossfadeRemaining,
+  // so the ITD stage can compute matching per-sample alpha values.
+  const int crossfadeRemainingAtStart = mCrossfadeRemaining;
+  const int nCrossfade = std::min(nFrames, crossfadeRemainingAtStart);
+
+  // -------------------------------------------------------------------------
+  // FIR convolution — two phases:
+  //   Phase 1 (crossfade): blend mCurrentState and mTargetState outputs per
+  //                        sample. Requires running both FIRs, but is bounded
+  //                        to mCrossfadeLengthSamples samples total.
+  //   Phase 2 (normal):    single FIR with committed mCurrentState only.
+  //
+  // Both phases share the single circular input buffer; no heap allocation.
+  // Processing order: FIR first (spectral shaping), then ITD delay below.
+  // -------------------------------------------------------------------------
   const int N = mFilterLength;
-  for (int i = 0; i < nFrames; ++i)
+
+  // Phase 1: crossfade portion.
+  for (int i = 0; i < nCrossfade; ++i)
+  {
+    mInputBuffer[mBufPos] = in[i];
+
+    float fromL = 0.f, fromR = 0.f, toL = 0.f, toR = 0.f;
+    for (int k = 0; k < N; ++k)
+    {
+      const int   idx = (mBufPos - k + N) % N;
+      const float s   = mInputBuffer[idx];
+      fromL += mCurrentState.irL[k] * s;
+      fromR += mCurrentState.irR[k] * s;
+      toL   += mTargetState.irL[k]  * s;
+      toR   += mTargetState.irR[k]  * s;
+    }
+
+    // alpha = 0 at the very start of the crossfade, 1 at the very end.
+    // (crossfadeRemainingAtStart - i) is the count of samples still to process
+    // including this one, so alpha rises as remaining falls.
+    const float alpha = 1.f - static_cast<float>(crossfadeRemainingAtStart - i)
+                              / static_cast<float>(mCrossfadeLengthSamples);
+    outL[i] = (1.f - alpha) * fromL + alpha * toL;
+    outR[i] = (1.f - alpha) * fromR + alpha * toR;
+
+    mBufPos = (mBufPos + 1) % N;
+  }
+
+  // Decrement crossfade counter; commit target when the crossfade completes.
+  // The copy does not heap-allocate: mCurrentState and mTargetState were
+  // preallocated to mFilterLength at load() and have the same capacity.
+  mCrossfadeRemaining -= nCrossfade;
+  if (mCrossfadeRemaining == 0 && crossfadeRemainingAtStart > 0)
+    mCurrentState = mTargetState;
+
+  // Phase 2: normal FIR (mCurrentState may have just been committed above).
+  for (int i = nCrossfade; i < nFrames; ++i)
   {
     mInputBuffer[mBufPos] = in[i];
 
     float sumL = 0.f, sumR = 0.f;
     for (int k = 0; k < N; ++k)
     {
-      int idx = (mBufPos - k + N) % N;
+      const int idx = (mBufPos - k + N) % N;
       sumL += mCurrentState.irL[k] * mInputBuffer[idx];
       sumR += mCurrentState.irR[k] * mInputBuffer[idx];
     }
@@ -197,18 +283,21 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
     mBufPos = (mBufPos + 1) % N;
   }
 
-  // Apply ITD (interaural time difference) delay per ear.
+  // -------------------------------------------------------------------------
+  // ITD (interaural time difference) delay stage.
   //
-  // Delay values in mCurrentState.delayL/R are in seconds (from SOFA via
-  // mysofa_getfilter_float). They are converted to fractional samples here using
-  // mSampleRate. Linear interpolation provides sub-sample accuracy without
-  // requiring allpass filters or heap allocation.
+  // During crossfade samples, the delay is linearly interpolated per sample
+  // between the "from" delay (mFromDelayL/R, captured at crossfade start) and
+  // the target delay (mTargetState.delayL/R). This mirrors the FIR blend and
+  // avoids a sudden ITD jump at the filter switch point.
   //
-  // Clamping: delay is clamped to [0, kMaxITDDelaySamples - 2] so that both
-  // the integer read tap and the (integer+1) interpolation tap stay within the
-  // preallocated delay buffer. Negative values are not expected from a valid
-  // SOFA file (asserted in lookupTarget) but are clamped defensively.
-
+  // After the crossfade, mCurrentState == mTargetState, so both paths produce
+  // the same committed delay. Delay values are in seconds; convert to fractional
+  // samples using mSampleRate. Linear interpolation provides sub-sample accuracy.
+  //
+  // Clamping: [0, kMaxITDDelaySamples - 2] keeps both the integer tap and the
+  // (integer+1) interpolation tap within the preallocated delay buffer.
+  // -------------------------------------------------------------------------
 #ifndef NDEBUG
   const bool applyITD = !mDebug.disableITD;
 #else
@@ -217,23 +306,38 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
 
   if (applyITD)
   {
-    // Convert seconds → fractional samples; clamp to buffer bounds.
-    // The upper bound leaves one extra slot so the interpolation tap (int+1) is safe.
     const float maxDelaySamples = static_cast<float>(kMaxITDDelaySamples - 2);
-
-    const float rawL = mCurrentState.delayL * mSampleRate;
-    const float rawR = mCurrentState.delayR * mSampleRate;
-    const float clampedL = rawL < 0.f ? 0.f : (rawL > maxDelaySamples ? maxDelaySamples : rawL);
-    const float clampedR = rawR < 0.f ? 0.f : (rawR > maxDelaySamples ? maxDelaySamples : rawR);
-
-    const int   intL  = static_cast<int>(clampedL);
-    const float fracL = clampedL - static_cast<float>(intL);
-    const int   intR  = static_cast<int>(clampedR);
-    const float fracR = clampedR - static_cast<float>(intR);
 
     for (int i = 0; i < nFrames; ++i)
     {
-      // Write FIR output into per-ear delay line, then read back with delay offset.
+      // Compute effective delay: interpolate during crossfade portion, use
+      // committed mCurrentState delay for the normal portion.
+      float effDelL, effDelR;
+      if (i < nCrossfade && crossfadeRemainingAtStart > 0)
+      {
+        const float alpha = 1.f - static_cast<float>(crossfadeRemainingAtStart - i)
+                                  / static_cast<float>(mCrossfadeLengthSamples);
+        effDelL = (1.f - alpha) * mFromDelayL + alpha * mTargetState.delayL;
+        effDelR = (1.f - alpha) * mFromDelayR + alpha * mTargetState.delayR;
+      }
+      else
+      {
+        effDelL = mCurrentState.delayL;
+        effDelR = mCurrentState.delayR;
+      }
+
+      // Convert seconds → fractional samples; clamp to buffer bounds.
+      const float rawL     = effDelL * mSampleRate;
+      const float rawR     = effDelR * mSampleRate;
+      const float clampedL = rawL < 0.f ? 0.f : (rawL > maxDelaySamples ? maxDelaySamples : rawL);
+      const float clampedR = rawR < 0.f ? 0.f : (rawR > maxDelaySamples ? maxDelaySamples : rawR);
+
+      const int   intL  = static_cast<int>(clampedL);
+      const float fracL = clampedL - static_cast<float>(intL);
+      const int   intR  = static_cast<int>(clampedR);
+      const float fracR = clampedR - static_cast<float>(intR);
+
+      // Write FIR output into per-ear delay line, then read back at the delay tap.
       // Linear interpolation: output = (1-frac)*buf[pos-int] + frac*buf[pos-int-1].
       mDelayBufL[mDelayPosL] = outL[i];
       {

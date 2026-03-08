@@ -55,13 +55,13 @@ Note: this task in isolation may sound worse than current behavior because ITD w
 - [x] Mark completed
 
 ### Task 5: Replace abrupt IR switching with short transition smoothing
-- [ ] Stop hard-switching HRTF filters on each block update
-- [ ] Implement a short fixed-time transition between previous and target HRTF states
-- [ ] Ensure the transition covers both FIR response and ITD behavior, not only coefficients
-- [ ] Keep the implementation deterministic and bounded for fast GUI dragging and automation playback
-- [ ] Avoid heap allocation, locks, or unbounded work on the audio thread
-- [ ] Confirm crossfade continuity test and gain stability test from Task 3 pass
-- [ ] Mark completed
+- [x] Stop hard-switching HRTF filters on each block update
+- [x] Implement a short fixed-time transition between previous and target HRTF states
+- [x] Ensure the transition covers both FIR response and ITD behavior, not only coefficients
+- [x] Keep the implementation deterministic and bounded for fast GUI dragging and automation playback
+- [x] Avoid heap allocation, locks, or unbounded work on the audio thread
+- [x] Confirm crossfade continuity test and gain stability test from Task 3 pass
+- [x] Mark completed
 
 ### Task 6: Add azimuth/elevation smoothing before HRTF lookup
 Note: smoothing (pre-lookup) and crossfade (post-lookup, Task 5) address different layers of the problem. Smoothing reduces how often the HRTF lookup target jumps; crossfade handles the transition when it does jump. Both are needed for dense SOFA grids.

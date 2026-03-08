@@ -88,6 +88,18 @@ private:
   int mCrossfadeLengthSamples = 0;
   int mCrossfadeRemaining = 0;
 
+  // Position tracking: avoid redundant SOFA lookups and spurious crossfade
+  // restarts when the host calls process() with the same parameters each block.
+  // Initialised to sentinel values to force the first lookup unconditionally.
+  float mLastAzimuthDeg  = 1e10f;
+  float mLastElevationDeg = 1e10f;
+  float mLastDistanceM   = 1e10f;
+
+  // Delay values captured at the start of the current crossfade ("from" side).
+  // Set whenever a new crossfade begins; used for per-sample ITD interpolation.
+  float mFromDelayL = 0.f;
+  float mFromDelayR = 0.f;
+
   // ITD fractional delay buffers (Task 4).
   // Processing order: FIR convolution first (spectral HRTF shaping), then per-ear
   // delay (interaural time difference). Delay values from SOFA are in seconds;
