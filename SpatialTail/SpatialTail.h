@@ -35,4 +35,5 @@ private:
   std::vector<float> mHrtfR;
   float mSmoothedDistanceGain = 1.f;
   float mDistanceSmoothCoeff  = 0.f;
+  double mLastSampleRate = 0.0;
 };

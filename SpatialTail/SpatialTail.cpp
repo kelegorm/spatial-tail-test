@@ -66,18 +66,24 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
 #if IPLUG_DSP
 void SpatialTail::OnReset()
 {
-  if (!mHRTF.load(DEFAULT_SOFA_PATH, static_cast<float>(GetSampleRate())))
-    DBGMSG("HRTFProcessor: failed to load SOFA file: %s\n", DEFAULT_SOFA_PATH);
+  // Only reload SOFA (disk I/O) when the sample rate actually changes.
+  // Buffer-size-only resets still resize the scratch buffers below.
+  const double sr = GetSampleRate();
+  if (sr != mLastSampleRate)
+  {
+    mLastSampleRate = sr;
+    if (!mHRTF.load(DEFAULT_SOFA_PATH, static_cast<float>(sr)))
+      DBGMSG("HRTFProcessor: failed to load SOFA file: %s\n", DEFAULT_SOFA_PATH);
+
+    // One-pole smoother: time constant ~20 ms to avoid zipper noise on distance knob
+    mDistanceSmoothCoeff = 1.f - std::exp(-1.f / (0.020f * static_cast<float>(sr)));
+    mSmoothedDistanceGain = 1.f; // reset to reference distance gain
+  }
 
   const int blockSize = GetBlockSize();
   mMonoIn.assign(blockSize, 0.f);
   mHrtfL.assign(blockSize, 0.f);
   mHrtfR.assign(blockSize, 0.f);
-
-  // One-pole smoother: time constant ~20 ms to avoid zipper noise on distance knob
-  const float sr = static_cast<float>(GetSampleRate());
-  mDistanceSmoothCoeff = 1.f - std::exp(-1.f / (0.020f * sr));
-  mSmoothedDistanceGain = 1.f; // reset to reference distance gain
 }
 
 void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
