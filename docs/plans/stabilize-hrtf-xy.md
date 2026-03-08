@@ -75,9 +75,9 @@ Note: smoothing (pre-lookup) and crossfade (post-lookup, Task 5) address differe
 - [x] Mark completed
 
 ### Task 7: Build validation and automated test gate
-- [ ] Rebuild and run validation commands
-- [ ] Run full Task 3 test suite and confirm all tests pass
-- [ ] Mark completed
+- [x] Rebuild and run validation commands
+- [x] Run full Task 3 test suite and confirm all tests pass
+- [x] Mark completed
 
 ### Task 8: Manual listening validation (blocked on user confirmation)
 This task cannot be completed by the agent. After Task 7 passes, prompt the user to perform listening tests and wait for explicit confirmation before marking items complete.
