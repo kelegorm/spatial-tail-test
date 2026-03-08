@@ -69,6 +69,8 @@ void SpatialTail::OnReset()
   // Only reload SOFA (disk I/O) when the sample rate actually changes.
   // Buffer-size-only resets still resize the scratch buffers below.
   const double sr = GetSampleRate();
+  spatialtail::ResetReverb(mReverb, sr);
+
   if (sr != mLastSampleRate)
   {
     mLastSampleRate = sr;
@@ -82,6 +84,10 @@ void SpatialTail::OnReset()
 
   const int blockSize = GetBlockSize();
   mMonoIn.assign(blockSize, 0.f);
+  mReverbInL.assign(blockSize, 0.0);
+  mReverbInR.assign(blockSize, 0.0);
+  mReverbOutL.assign(blockSize, 0.0);
+  mReverbOutR.assign(blockSize, 0.0);
   mHrtfL.assign(blockSize, 0.f);
   mHrtfR.assign(blockSize, 0.f);
 }
@@ -93,15 +99,42 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const float distance = static_cast<float>(GetParam(kDistance)->Value());
   const float dryWet   = static_cast<float>(GetParam(kDryWet)->Value());
 
-  // Sum stereo input to mono (only 1 input channel configured, but guard anyway)
+  if (nFrames > static_cast<int>(mMonoIn.size()))
+  {
+    mMonoIn.assign(nFrames, 0.f);
+    mReverbInL.assign(nFrames, 0.0);
+    mReverbInR.assign(nFrames, 0.0);
+    mReverbOutL.assign(nFrames, 0.0);
+    mReverbOutR.assign(nFrames, 0.0);
+    mHrtfL.assign(nFrames, 0.f);
+    mHrtfR.assign(nFrames, 0.f);
+  }
+
+  // Reverb input contract: the reverb stage takes exactly one mono feed.
+  // The source is a mono fold-down of host inputs and is then duplicated to
+  // dual-mono for the current reverb engine implementation.
   const int nInChans = NInChansConnected();
   std::fill(mMonoIn.begin(), mMonoIn.begin() + nFrames, 0.f);
 
-  if (nInChans >= 1)
+  if (nInChans == 1)
   {
     for (int s = 0; s < nFrames; ++s)
       mMonoIn[s] = static_cast<float>(inputs[0][s]);
   }
+  else if (nInChans > 1)
+  {
+    for (int s = 0; s < nFrames; ++s)
+    {
+      float mono = 0.f;
+      for (int c = 0; c < nInChans; ++c)
+        mono += static_cast<float>(inputs[c][s]);
+
+      mMonoIn[s] = mono / static_cast<float>(nInChans);
+    }
+  }
+
+  spatialtail::CopyMonoToStereoReverbInputs(mMonoIn.data(), mReverbInL.data(), mReverbInR.data(), nFrames);
+  mReverb.ProcessSampleBlock(mReverbInL.data(), mReverbInR.data(), mReverbOutL.data(), mReverbOutR.data(), nFrames);
 
   // If HRTF failed to load, pass mono through to both channels without applying
   // distance gain (which could boost up to 10x and cause clipping on the fallback signal).

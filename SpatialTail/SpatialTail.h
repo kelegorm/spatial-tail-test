@@ -2,6 +2,7 @@
 
 #include "IPlug_include_in_plug_hdr.h"
 #include "HRTFProcessor.h"
+#include "ReverbStage.h"
 #include <vector>
 
 const int kNumPresets = 1;
@@ -29,8 +30,13 @@ public:
 #endif
 
 private:
+  WDL_ReverbEngine mReverb;
   HRTFProcessor mHRTF;
   std::vector<float> mMonoIn;
+  std::vector<double> mReverbInL;
+  std::vector<double> mReverbInR;
+  std::vector<double> mReverbOutL;
+  std::vector<double> mReverbOutR;
   std::vector<float> mHrtfL;
   std::vector<float> mHrtfR;
   float mSmoothedDistanceGain = 1.f;

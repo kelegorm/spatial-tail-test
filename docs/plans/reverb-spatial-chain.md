@@ -9,11 +9,11 @@ Goal: spatialize the reverb output (tail/object), not the raw dry input.
 - `pluginval --strictness-level 5 ~/Library/Audio/Plug-Ins/VST3/SpatialTail.vst3`
 
 ### Task 1: Reverb processor integration
-- [ ] Add/initialize a reverb processor state in `SpatialTail/SpatialTail.h/.cpp` (allocation, reset, sample-rate/block-size handling)
-- [ ] Define reverb input contract as mono (single-channel feed from mono fold-down), including explicit channel assumptions in code
-- [ ] In `OnReset()` correctly reset reverb internals to avoid stale tail artifacts after transport/sample-rate changes
-- [ ] Add safe reverb defaults (room/decay/damping baseline) so routing in Task 2 has predictable behavior
-- [ ] Mark completed
+- [x] Add/initialize a reverb processor state in `SpatialTail/SpatialTail.h/.cpp` (allocation, reset, sample-rate/block-size handling)
+- [x] Define reverb input contract as mono (single-channel feed from mono fold-down), including explicit channel assumptions in code
+- [x] In `OnReset()` correctly reset reverb internals to avoid stale tail artifacts after transport/sample-rate changes
+- [x] Add safe reverb defaults (room/decay/damping baseline) so routing in Task 2 has predictable behavior
+- [x] Mark completed
 
 ### Task 2: DSP routing change (reverb -> HRTF)
 - [ ] In `SpatialTail/SpatialTail.cpp` change the processing chain so input is first passed through reverb, and only reverb output is sent to `HRTFProcessor::process()`
