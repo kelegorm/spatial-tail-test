@@ -37,9 +37,14 @@ private:
   std::vector<double> mReverbInR;
   std::vector<double> mReverbOutL;
   std::vector<double> mReverbOutR;
+  std::vector<float> mDryAlignedMono;
+  std::vector<float> mDryDelayLine;
   std::vector<float> mReverbWetMono;
   std::vector<float> mHrtfL;
   std::vector<float> mHrtfR;
+  int mReverbLatencySamples = 0;
+  int mReverbTailSamples = 0;
+  int mDryDelayWritePos = 0;
   float mSmoothedDistanceGain = 1.f;
   float mDistanceSmoothCoeff  = 0.f;
   double mLastSampleRate = 0.0;

@@ -119,6 +119,58 @@ bool TestResetClearsTail()
 
   return postResetTailMax <= kEpsilon;
 }
+
+bool TestHostTimingMeasurement()
+{
+  const auto timing44k = spatialtail::MeasureReverbHostTiming(44100.0);
+  if (timing44k.latencySamples <= 0) return false;
+  if (timing44k.tailSamples <= timing44k.latencySamples) return false;
+
+  const auto timing48k = spatialtail::MeasureReverbHostTiming(48000.0);
+  if (timing48k.latencySamples <= 0) return false;
+  if (timing48k.tailSamples <= timing48k.latencySamples) return false;
+
+  return true;
+}
+
+bool TestDryAlignmentDelay()
+{
+  std::vector<float> delayLine;
+  int writePos = 0;
+  constexpr int delaySamples = 2;
+  spatialtail::PrepareMonoDelayLine(delayLine, delaySamples, writePos);
+
+  const std::vector<float> inA = {1.f, 2.f, 3.f, 4.f};
+  std::vector<float> outA(inA.size(), 0.f);
+  spatialtail::ApplyMonoDelay(inA.data(), outA.data(), static_cast<int>(inA.size()), delaySamples, delayLine, writePos);
+
+  const std::vector<float> expectedA = {0.f, 0.f, 1.f, 2.f};
+  for (size_t i = 0; i < outA.size(); ++i)
+  {
+    if (std::fabs(outA[i] - expectedA[i]) > static_cast<float>(kEpsilon)) return false;
+  }
+
+  const std::vector<float> inB = {5.f, 6.f};
+  std::vector<float> outB(inB.size(), 0.f);
+  spatialtail::ApplyMonoDelay(inB.data(), outB.data(), static_cast<int>(inB.size()), delaySamples, delayLine, writePos);
+
+  const std::vector<float> expectedB = {3.f, 4.f};
+  for (size_t i = 0; i < outB.size(); ++i)
+  {
+    if (std::fabs(outB[i] - expectedB[i]) > static_cast<float>(kEpsilon)) return false;
+  }
+
+  std::vector<float> passThrough(3, 0.f);
+  const std::vector<float> inNoDelay = {0.5f, -0.25f, 1.f};
+  spatialtail::ApplyMonoDelay(inNoDelay.data(), passThrough.data(), static_cast<int>(inNoDelay.size()), 0, delayLine, writePos);
+
+  for (size_t i = 0; i < inNoDelay.size(); ++i)
+  {
+    if (std::fabs(passThrough[i] - inNoDelay[i]) > static_cast<float>(kEpsilon)) return false;
+  }
+
+  return true;
+}
 } // namespace
 
 int main()
@@ -150,6 +202,18 @@ int main()
   if (!TestResetClearsTail())
   {
     std::cerr << "TestResetClearsTail failed\n";
+    return 1;
+  }
+
+  if (!TestHostTimingMeasurement())
+  {
+    std::cerr << "TestHostTimingMeasurement failed\n";
+    return 1;
+  }
+
+  if (!TestDryAlignmentDelay())
+  {
+    std::cerr << "TestDryAlignmentDelay failed\n";
     return 1;
   }
 

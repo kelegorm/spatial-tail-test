@@ -23,10 +23,10 @@ Goal: spatialize the reverb output (tail/object), not the raw dry input.
 - [x] Mark completed
 
 ### Task 3: Host contract for latency and tail
-- [ ] Determine reverb algorithmic latency; if non-zero, report it to host via plugin latency API and keep dry/wet time-aligned
-- [ ] Expose correct tail behavior/length via plugin API so transport stop does not hard-cut reverb tail
-- [ ] Rebuild and run validation commands
-- [ ] Mark completed
+- [x] Determine reverb algorithmic latency; if non-zero, report it to host via plugin latency API and keep dry/wet time-aligned
+- [x] Expose correct tail behavior/length via plugin API so transport stop does not hard-cut reverb tail
+- [x] Rebuild and run validation commands
+- [x] Mark completed
 
 ### Task 4: Parameter registration and wiring for reverb stage
 - [ ] Add parameters needed for useful reverb behavior (minimum: room/decay and damping/tone control)

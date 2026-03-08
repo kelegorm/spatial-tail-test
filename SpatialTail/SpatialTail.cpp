@@ -16,6 +16,12 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
   GetParam(kDistance)->InitDouble("Distance", 1., 0.1, 10., 0.01, "m");
   GetParam(kDryWet)->InitDouble("Dry/Wet", 1., 0., 1., 0.01, "");
 
+  const auto initialTiming = spatialtail::MeasureReverbHostTiming(44100.0);
+  mReverbLatencySamples = initialTiming.latencySamples;
+  mReverbTailSamples = initialTiming.tailSamples;
+  SetLatency(mReverbLatencySamples);
+  SetTailSize(mReverbTailSamples);
+
 #if IPLUG_EDITOR // http://bit.ly/2S64BDd
   mMakeGraphicsFunc = [&]() {
     return MakeGraphics(*this, PLUG_WIDTH, PLUG_HEIGHT, PLUG_FPS, GetScaleForScreen(PLUG_WIDTH, PLUG_HEIGHT));
@@ -74,6 +80,12 @@ void SpatialTail::OnReset()
   if (sr != mLastSampleRate)
   {
     mLastSampleRate = sr;
+    const auto reverbTiming = spatialtail::MeasureReverbHostTiming(sr);
+    mReverbLatencySamples = reverbTiming.latencySamples;
+    mReverbTailSamples = reverbTiming.tailSamples;
+    SetLatency(mReverbLatencySamples);
+    SetTailSize(mReverbTailSamples);
+
     if (!mHRTF.load(DEFAULT_SOFA_PATH, static_cast<float>(sr)))
       DBGMSG("HRTFProcessor: failed to load SOFA file: %s\n", DEFAULT_SOFA_PATH);
 
@@ -88,9 +100,11 @@ void SpatialTail::OnReset()
   mReverbInR.assign(blockSize, 0.0);
   mReverbOutL.assign(blockSize, 0.0);
   mReverbOutR.assign(blockSize, 0.0);
+  mDryAlignedMono.assign(blockSize, 0.f);
   mReverbWetMono.assign(blockSize, 0.f);
   mHrtfL.assign(blockSize, 0.f);
   mHrtfR.assign(blockSize, 0.f);
+  spatialtail::PrepareMonoDelayLine(mDryDelayLine, mReverbLatencySamples, mDryDelayWritePos);
 }
 
 void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
@@ -107,6 +121,7 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mReverbInR.assign(nFrames, 0.0);
     mReverbOutL.assign(nFrames, 0.0);
     mReverbOutR.assign(nFrames, 0.0);
+    mDryAlignedMono.assign(nFrames, 0.f);
     mReverbWetMono.assign(nFrames, 0.f);
     mHrtfL.assign(nFrames, 0.f);
     mHrtfR.assign(nFrames, 0.f);
@@ -121,6 +136,7 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   spatialtail::CopyMonoToStereoReverbInputs(mMonoIn.data(), mReverbInL.data(), mReverbInR.data(), nFrames);
   mReverb.ProcessSampleBlock(mReverbInL.data(), mReverbInR.data(), mReverbOutL.data(), mReverbOutR.data(), nFrames);
   spatialtail::CollapseStereoReverbToMono(mReverbOutL.data(), mReverbOutR.data(), mReverbWetMono.data(), nFrames);
+  spatialtail::ApplyMonoDelay(mMonoIn.data(), mDryAlignedMono.data(), nFrames, mReverbLatencySamples, mDryDelayLine, mDryDelayWritePos);
 
   const bool hrtfLoaded = mHRTF.isLoaded();
   if (hrtfLoaded)
@@ -148,7 +164,7 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   {
     mSmoothedDistanceGain += mDistanceSmoothCoeff * (targetGain - mSmoothedDistanceGain);
     const float wet = mSmoothedDistanceGain * dryWet;
-    const float dry = mMonoIn[s] * (1.f - dryWet);
+    const float dry = mDryAlignedMono[s] * (1.f - dryWet);
     outputs[0][s] = static_cast<sample>(dry + mHrtfL[s] * wet);
     outputs[1][s] = static_cast<sample>(dry + mHrtfR[s] * wet);
   }
