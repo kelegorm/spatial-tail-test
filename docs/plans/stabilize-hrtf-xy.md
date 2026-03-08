@@ -36,13 +36,13 @@ Goal:
 - [x] Mark completed
 
 ### Task 3: Automated tests for HRTF processing correctness
-- [ ] ITD delay test: feed an impulse at a known azimuth, measure arrival time difference between L/R channels, compare against expected `delayL`/`delayR` from SOFA within tolerance
-- [ ] Crossfade continuity test: change azimuth every block during processing, verify no sample discontinuities between block boundaries (max abs diff between last sample of block N and first sample of block N+1 below threshold)
-- [ ] Smoothing response test: apply an instantaneous azimuth jump, verify the value reaching the HRTF lookup changes gradually over multiple blocks rather than stepping immediately
-- [ ] Gain stability test: process white noise through multiple positions (sweep), verify output RMS stays within acceptable bounds and does not clip
-- [ ] No-allocation test: run processing under debug instrumentation and confirm no heap allocation occurs on the audio thread during position changes
-- [ ] All tests must pass via validation commands before proceeding to Task 4
-- [ ] Mark completed
+- [x] ITD delay test: feed an impulse at a known azimuth, measure arrival time difference between L/R channels, compare against expected `delayL`/`delayR` from SOFA within tolerance
+- [x] Crossfade continuity test: change azimuth every block during processing, verify no sample discontinuities between block boundaries (max abs diff between last sample of block N and first sample of block N+1 below threshold)
+- [x] Smoothing response test: apply an instantaneous azimuth jump, verify the value reaching the HRTF lookup changes gradually over multiple blocks rather than stepping immediately
+- [x] Gain stability test: process white noise through multiple positions (sweep), verify output RMS stays within acceptable bounds and does not clip
+- [x] No-allocation test: run processing under debug instrumentation and confirm no heap allocation occurs on the audio thread during position changes
+- [x] All tests must pass via validation commands before proceeding to Task 4
+- [x] Mark completed
 
 ### Task 4: Apply libmysofa ITD delays instead of ignoring them
 Note: this task in isolation may sound worse than current behavior because ITD will jump without crossfade smoothing. This is expected and resolved in Task 5.

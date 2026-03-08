@@ -81,4 +81,32 @@ if(BUILD_TESTING)
   add_executable(reverb_stage_tests tests/reverb_stage_tests.cpp)
   target_include_directories(reverb_stage_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   add_test(NAME reverb_stage_tests COMMAND reverb_stage_tests)
+
+  # SOFA file used by hrtf_processor_tests. Falls back to the MIT KEMAR file
+  # shipped with libmysofa. Override with -DHRTF_TEST_SOFA_PATH=/path/to/file.sofa
+  if(NOT DEFINED HRTF_TEST_SOFA_PATH)
+    set(HRTF_TEST_SOFA_PATH
+      "${CMAKE_CURRENT_SOURCE_DIR}/../libs/libmysofa/share/MIT_KEMAR_normal_pinna.sofa")
+  endif()
+
+  add_executable(hrtf_processor_tests
+    tests/hrtf_processor_tests.cpp
+    HRTFProcessor.cpp
+  )
+  target_compile_features(hrtf_processor_tests PRIVATE cxx_std_17)
+  target_include_directories(hrtf_processor_tests
+    PRIVATE
+      "${CMAKE_CURRENT_SOURCE_DIR}"
+      "${SPATIALTAIL_LIBMYSOFA_SRC_DIR}"
+  )
+  target_include_directories(hrtf_processor_tests SYSTEM PRIVATE
+    "${SPATIALTAIL_LIBMYSOFA_BUILD_DIR}"
+  )
+  target_compile_definitions(hrtf_processor_tests PRIVATE
+    "HRTF_TEST_SOFA_PATH=\"${HRTF_TEST_SOFA_PATH}\""
+  )
+  if(EXISTS "${SPATIALTAIL_LIBMYSOFA_STATIC}")
+    target_link_libraries(hrtf_processor_tests PRIVATE "${SPATIALTAIL_LIBMYSOFA_STATIC}" z)
+  endif()
+  add_test(NAME hrtf_processor_tests COMMAND hrtf_processor_tests)
 endif()
