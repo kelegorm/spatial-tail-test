@@ -5,6 +5,10 @@
 
 #include "hrtf/mysofa.h"
 
+// Default crossfade length in samples (applies at typical 44.1/48 kHz rates).
+// Task 5 will use this; set conservatively so it is ready without touching load().
+static constexpr int kDefaultCrossfadeSamples = 128;
+
 HRTFProcessor::HRTFProcessor() {}
 
 HRTFProcessor::~HRTFProcessor()
@@ -34,21 +38,31 @@ bool HRTFProcessor::load(const char* sofaPath, float sampleRate)
     return false;
   }
 
-  mIRLeft.assign(mFilterLength, 0.f);
-  mIRRight.assign(mFilterLength, 0.f);
+  // Preallocate both current and target IR storage; no further heap allocation
+  // occurs on the audio thread.
+  mCurrentState.resize(mFilterLength);
+  mTargetState.resize(mFilterLength);
+
+  // Circular input buffer for FIR convolution.
   mInputBuffer.assign(mFilterLength, 0.f);
   mBufPos = 0;
+
+  // Crossfade length: fixed at load time, used by the transition logic in Task 5.
+  mCrossfadeLengthSamples = kDefaultCrossfadeSamples;
+  mCrossfadeRemaining = 0;
+
+  mTargetPending = false;
 
   return true;
 }
 
-void HRTFProcessor::updateFilter(float azimuthDeg, float elevationDeg, float distanceM)
+void HRTFProcessor::lookupTarget(float azimuthDeg, float elevationDeg, float distanceM)
 {
   if (!mEasy)
     return;
 
   // Clamp to front-hemisphere bounds regardless of host automation.
-  // Azimuth [-90, 90] keeps source in front; elevation [-90, 90] is already full range.
+  // Azimuth [-90, 90] keeps source in front; elevation [-90, 90] is full range.
   const float az = std::max(-90.f, std::min(90.f, azimuthDeg));
   const float el = std::max(-90.f, std::min(90.f, elevationDeg));
   const float dist = std::max(0.1f, distanceM);
@@ -60,12 +74,13 @@ void HRTFProcessor::updateFilter(float azimuthDeg, float elevationDeg, float dis
   float coords[3] = { -az, el, dist };
   mysofa_s2c(coords);
 
-  // delayL/delayR (ITD fractional delays) intentionally ignored for MVP
-  float delayL, delayR;
+  // Write lookup result into mTargetState (not mCurrentState).
+  // delayL/delayR are ITD fractional delays in seconds — stored for Task 4.
   mysofa_getfilter_float(mEasy, coords[0], coords[1], coords[2],
-                         mIRLeft.data(), mIRRight.data(), &delayL, &delayR);
-  (void)delayL;
-  (void)delayR;
+                         mTargetState.irL.data(), mTargetState.irR.data(),
+                         &mTargetState.delayL, &mTargetState.delayR);
+
+  mTargetPending = true;
 }
 
 void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFrames,
@@ -73,13 +88,25 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
 {
   if (!mEasy)
   {
+    // Fallback: pass input through to both channels unchanged.
     memcpy(outL, in, nFrames * sizeof(float));
     memcpy(outR, in, nFrames * sizeof(float));
     return;
   }
 
-  updateFilter(azimuthDeg, elevationDeg, distanceM);
+  // Look up the new target for this block and store it in mTargetState.
+  lookupTarget(azimuthDeg, elevationDeg, distanceM);
 
+  // Apply the pending target: abrupt switch for now (Task 5 will crossfade).
+  // mCrossfadeRemaining is managed here once crossfade logic is added in Task 5.
+  if (mTargetPending)
+  {
+    mCurrentState = mTargetState;  // copy preallocated vectors — no heap alloc
+    mTargetPending = false;
+    mCrossfadeRemaining = 0;       // no crossfade yet; Task 5 will set this
+  }
+
+  // Time-domain FIR convolution using mCurrentState IRs and the circular input buffer.
   const int N = mFilterLength;
   for (int i = 0; i < nFrames; ++i)
   {
@@ -89,8 +116,8 @@ void HRTFProcessor::process(const float* in, float* outL, float* outR, int nFram
     for (int k = 0; k < N; ++k)
     {
       int idx = (mBufPos - k + N) % N;
-      sumL += mIRLeft[k] * mInputBuffer[idx];
-      sumR += mIRRight[k] * mInputBuffer[idx];
+      sumL += mCurrentState.irL[k] * mInputBuffer[idx];
+      sumR += mCurrentState.irR[k] * mInputBuffer[idx];
     }
 
     outL[i] = sumL;

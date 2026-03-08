@@ -21,12 +21,12 @@ Goal:
 ---
 
 ### Task 1: Refactor HRTFProcessor state for smooth HRTF transitions
-- [ ] Inspect `HRTFProcessor` and separate "current active HRTF state" from "newly looked up target HRTF state"
-- [ ] Add preallocated storage for current and target IRs for both ears
-- [ ] Add preallocated storage for current and target ITD delays for both ears
-- [ ] Add transition state needed for short HRTF crossfades without runtime allocation
-- [ ] Keep fallback behavior unchanged when SOFA is not loaded
-- [ ] Mark completed
+- [x] Inspect `HRTFProcessor` and separate "current active HRTF state" from "newly looked up target HRTF state"
+- [x] Add preallocated storage for current and target IRs for both ears
+- [x] Add preallocated storage for current and target ITD delays for both ears
+- [x] Add transition state needed for short HRTF crossfades without runtime allocation
+- [x] Keep fallback behavior unchanged when SOFA is not loaded
+- [x] Mark completed
 
 ### Task 2: Debug instrumentation for HRTF motion diagnostics
 - [ ] Add debug-only logging or assertions for azimuth, elevation, distance, selected ITD delays, and transition activity
