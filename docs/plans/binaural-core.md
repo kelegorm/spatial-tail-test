@@ -38,8 +38,8 @@ Stack: iPlug2, libmysofa (with bundled default.sofa), C++17, Xcode.
 - [x] Mark completed
 
 ### Task 5: GUI
-- [ ] Add XY pad control for Azimuth (X axis -180..180) and Elevation (Y axis -90..90)
-- [ ] Add knob for Distance
-- [ ] Add knob for DryWet
-- [ ] Connect controls to plugin parameters
-- [ ] Mark completed
+- [x] Add XY pad control for Azimuth (X axis -180..180) and Elevation (Y axis -90..90)
+- [x] Add knob for Distance
+- [x] Add knob for DryWet
+- [x] Connect controls to plugin parameters
+- [x] Mark completed

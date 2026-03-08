@@ -27,11 +27,38 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
     const IRECT bounds = pGraphics->GetBounds();
     const IRECT innerBounds = bounds.GetPadded(-10.f);
+
+    // Version info top-right
     const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
-    pGraphics->AttachControl(new ITextControl(innerBounds.GetMidVPadded(50), "SpatialTail", IText(50)));
     WDL_String buildInfoStr;
     GetBuildInfoStr(buildInfoStr, __DATE__, __TIME__);
     pGraphics->AttachControl(new ITextControl(versionBounds, buildInfoStr.Get(), DEFAULT_TEXT.WithAlign(EAlign::Far)));
+
+    // Title at top
+    const IRECT titleBounds = innerBounds.GetFromTop(40.f);
+    pGraphics->AttachControl(new ITextControl(titleBounds, "SpatialTail", IText(28)));
+
+    // XY pad for Azimuth (X) and Elevation (Y) - large square in upper area
+    const float padSize = 380.f;
+    const float padTop = 55.f;
+    const IRECT padBounds = IRECT::MakeMidXYWH(bounds.MW(), padTop + padSize * 0.5f, padSize, padSize);
+    pGraphics->AttachControl(new IVXYPadControl(padBounds, {kAzimuth, kElevation}, "Azimuth / Elevation"));
+
+    // Labels for XY axes
+    const IRECT xLabelBounds = IRECT(padBounds.L, padBounds.B + 2.f, padBounds.R, padBounds.B + 18.f);
+    pGraphics->AttachControl(new ITextControl(xLabelBounds, "Azimuth (-180..180 deg)", IText(12)));
+
+    // Knobs row at the bottom
+    const float knobSize = 80.f;
+    const float knobY = padBounds.B + 30.f;
+    const float totalKnobWidth = knobSize * 2 + 40.f;
+    const float knobStartX = bounds.MW() - totalKnobWidth * 0.5f;
+
+    const IRECT distanceBounds = IRECT(knobStartX, knobY, knobStartX + knobSize, knobY + knobSize);
+    pGraphics->AttachControl(new IVKnobControl(distanceBounds, kDistance, "Distance"));
+
+    const IRECT dryWetBounds = IRECT(knobStartX + knobSize + 40.f, knobY, knobStartX + knobSize * 2 + 40.f, knobY + knobSize);
+    pGraphics->AttachControl(new IVKnobControl(dryWetBounds, kDryWet, "Dry/Wet"));
   };
 #endif
 }
