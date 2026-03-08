@@ -375,18 +375,32 @@ bool TestResetClearsTail()
 
 bool TestHostTimingMeasurement()
 {
+  auto ValidateTiming = [](double sampleRate, const spatialtail::ReverbHostTiming& timing) -> bool {
+    if (timing.latencySamples <= 0) return false;
+    if (timing.tailSamples < timing.latencySamples) return false;
+
+    const int probeCap = std::max(256, static_cast<int>(sampleRate * spatialtail::kReverbTailMaxProbeSeconds));
+    if (timing.tailSamples == probeCap && !timing.tailTruncated)
+      return false;
+
+    if (timing.tailTruncated && timing.tailSamples != probeCap)
+      return false;
+
+    return true;
+  };
+
   const auto timing44k = spatialtail::MeasureReverbHostTiming(44100.0);
-  if (timing44k.latencySamples <= 0) return false;
-  if (timing44k.tailSamples <= timing44k.latencySamples) return false;
+  if (!ValidateTiming(44100.0, timing44k)) return false;
 
   const auto timing44kDefaults = spatialtail::MeasureReverbHostTiming(
       44100.0, static_cast<float>(spatialtail::kReverbDefaultRoomSize), static_cast<float>(spatialtail::kReverbDefaultDamping));
+  if (!ValidateTiming(44100.0, timing44kDefaults)) return false;
+  if (timing44kDefaults.tailTruncated) return false;
   if (timing44k.tailSamples < timing44kDefaults.tailSamples)
     return false;
 
   const auto timing48k = spatialtail::MeasureReverbHostTiming(48000.0);
-  if (timing48k.latencySamples <= 0) return false;
-  if (timing48k.tailSamples <= timing48k.latencySamples) return false;
+  if (!ValidateTiming(48000.0, timing48k)) return false;
 
   return true;
 }

@@ -21,9 +21,8 @@ SpatialTail::SpatialTail(const InstanceInfo& info)
   GetParam(kReverbDamping)->InitDouble("Reverb Damping", spatialtail::kReverbDefaultDamping,
                                        spatialtail::kReverbDampingMin, spatialtail::kReverbDampingMax, 0.001, "");
 
-  const auto initialTiming = spatialtail::MeasureReverbHostTiming(44100.0);
-  mReverbLatencySamples = initialTiming.latencySamples;
-  mReverbTailSamples = initialTiming.tailSamples;
+  mReverbLatencySamples = 0;
+  mReverbTailSamples = kTailInfinite;
   SetLatency(mReverbLatencySamples);
   SetTailSize(mReverbTailSamples);
 
@@ -103,7 +102,7 @@ void SpatialTail::OnReset()
     mLastSampleRate = sr;
     const auto reverbTiming = spatialtail::MeasureReverbHostTiming(sr);
     mReverbLatencySamples = reverbTiming.latencySamples;
-    mReverbTailSamples = reverbTiming.tailSamples;
+    mReverbTailSamples = reverbTiming.tailTruncated ? kTailInfinite : reverbTiming.tailSamples;
     SetLatency(mReverbLatencySamples);
     SetTailSize(mReverbTailSamples);
 
@@ -140,15 +139,18 @@ void SpatialTail::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
   if (nFrames > static_cast<int>(mMonoIn.size()))
   {
-    mMonoIn.assign(nFrames, 0.f);
-    mReverbInL.assign(nFrames, 0.0);
-    mReverbInR.assign(nFrames, 0.0);
-    mReverbOutL.assign(nFrames, 0.0);
-    mReverbOutR.assign(nFrames, 0.0);
-    mDryAlignedMono.assign(nFrames, 0.f);
-    mReverbWetMono.assign(nFrames, 0.f);
-    mHrtfL.assign(nFrames, 0.f);
-    mHrtfR.assign(nFrames, 0.f);
+#if !defined(NDEBUG)
+    DBGMSG("SpatialTail DEBUG: ProcessBlock received nFrames=%d larger than prepared buffers=%d. "
+           "Outputting silence to avoid realtime heap allocation.\n",
+           nFrames, static_cast<int>(mMonoIn.size()));
+    assert(false && "ProcessBlock frame count exceeded prepared buffer size.");
+#endif
+    for (int s = 0; s < nFrames; ++s)
+    {
+      outputs[0][s] = 0.;
+      outputs[1][s] = 0.;
+    }
+    return;
   }
 
   // Reverb input contract: the reverb stage takes exactly one mono feed.

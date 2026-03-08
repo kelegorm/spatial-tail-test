@@ -31,6 +31,7 @@ struct ReverbHostTiming
 {
   int latencySamples = 0;
   int tailSamples = 0;
+  bool tailTruncated = false;
 };
 
 inline void ConfigureReverbDefaults(WDL_ReverbEngine& reverb)
@@ -306,6 +307,12 @@ inline ReverbHostTiming MeasureReverbHostTiming(double sampleRate,
 
     if (firstActiveSample >= 0 && lastActiveSample >= 0 && (processedSamples - lastActiveSample) >= silenceWindowSamples)
       break;
+  }
+
+  if (processedSamples >= maxProbeSamples && lastActiveSample >= 0
+      && (processedSamples - lastActiveSample) < silenceWindowSamples)
+  {
+    timing.tailTruncated = true;
   }
 
   timing.latencySamples = firstActiveSample > 0 ? firstActiveSample : 0;
