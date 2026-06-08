@@ -3,7 +3,7 @@
 ## Project
 Binaural reverb tail prototype VST3/CLAP plugin.
 Goal: test one reverb tail wrapped as a spatially localized 3D object using binaural panning (HRTF).
-This is a proof-of-concept before building the full "cloudverb" effect.
+This is a proof-of-concept before building a fuller spatialized reverb effect.
 
 ## Stack
 - C++17
