@@ -36,6 +36,21 @@ cmake --build build
 cd ../..
 ```
 
+Both build systems expect the library in `libs/libmysofa/build/`: it holds
+`libmysofa.a` plus the generated `mysofa_export.h` / `config.h`, and that path is
+hardcoded in `SpatialTail/config/SpatialTail-mac.xcconfig` and
+`SpatialTail/CMakeLists.txt`. Never clean it with `rm -rf build` — upstream tracks
+`build/.empty` and `build/project.json`, so deleting the directory leaves the
+submodule permanently dirty. Clean rebuild:
+```bash
+cd libs/libmysofa
+git clean -xfd build   # same effect as rm -rf, keeps the two tracked files
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+cmake --build build
+cd ../..
+```
+If those files were already deleted: `git -C libs/libmysofa checkout -- build`.
+
 ## Test
 ```bash
 pluginval --strictness-level 5 ~/Library/Audio/Plug-Ins/VST3/SpatialTail.vst3
